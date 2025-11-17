@@ -6,7 +6,7 @@ export const db = new Dexie('VardhanEMRDatabase');
 // Define database schema
 db.version(1).stores({
   // Core entities
-  patients: '++id, uhid, name, phone, aadhaar, email, &uhid, [name+phone], createdAt, updatedAt, syncStatus',
+  patients: '++id, &uhid, name, phone, aadhaar, email, createdAt, updatedAt, syncStatus',
   prescriptions: '++id, patientId, uhid, date, doctorId, diagnosis, syncStatus, createdAt, updatedAt',
   vitals: '++id, patientId, uhid, date, recordedBy, syncStatus, createdAt',
   appointments: '++id, patientId, uhid, date, status, doctorId, syncStatus, createdAt',
