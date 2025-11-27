@@ -11,7 +11,11 @@ function Settings() {
     docOnApiUrl: '',
     docOnApiKey: '',
     autoSyncEnabled: true,
-    syncIntervalMinutes: 5
+    syncIntervalMinutes: 5,
+    gravityApiUrl: '',
+    gravityApiKey: '',
+    gravityAutoSyncEnabled: true,
+    gravitySyncIntervalMinutes: 2
   });
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -29,7 +33,11 @@ function Settings() {
       docOnApiUrl: await DatabaseService.getSetting('docOnApiUrl') || '',
       docOnApiKey: await DatabaseService.getSetting('docOnApiKey') || '',
       autoSyncEnabled: (await DatabaseService.getSetting('autoSyncEnabled')) !== 'false',
-      syncIntervalMinutes: parseInt(await DatabaseService.getSetting('syncIntervalMinutes')) || 5
+      syncIntervalMinutes: parseInt(await DatabaseService.getSetting('syncIntervalMinutes')) || 5,
+      gravityApiUrl: await DatabaseService.getSetting('gravityApiUrl') || '',
+      gravityApiKey: await DatabaseService.getSetting('gravityApiKey') || '',
+      gravityAutoSyncEnabled: (await DatabaseService.getSetting('gravityAutoSyncEnabled')) !== 'false',
+      gravitySyncIntervalMinutes: parseInt(await DatabaseService.getSetting('gravitySyncIntervalMinutes')) || 2
     };
     setSettings(loadedSettings);
     setLoading(false);
@@ -195,6 +203,68 @@ function Settings() {
               <option value="15">15 minutes</option>
               <option value="30">30 minutes</option>
             </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Gravity HMS Integration */}
+      <div className="card">
+        <h2 className="text-xl font-bold mb-4">Gravity HMS Integration</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          Connect to Gravity HMS to automatically sync appointments and walk-in data in real-time.
+        </p>
+        <div className="space-y-4">
+          <div>
+            <label className="label">Gravity API URL</label>
+            <input
+              type="text"
+              value={settings.gravityApiUrl}
+              onChange={(e) => setSettings({ ...settings, gravityApiUrl: e.target.value })}
+              placeholder="https://gravity-hms.example.com/api"
+              className="input"
+            />
+          </div>
+          <div>
+            <label className="label">Gravity API Key</label>
+            <input
+              type="password"
+              value={settings.gravityApiKey}
+              onChange={(e) => setSettings({ ...settings, gravityApiKey: e.target.value })}
+              placeholder="Enter your Gravity HMS API key"
+              className="input"
+            />
+          </div>
+          <div className="flex items-center space-x-3">
+            <input
+              type="checkbox"
+              id="gravityAutoSync"
+              checked={settings.gravityAutoSyncEnabled}
+              onChange={(e) => setSettings({ ...settings, gravityAutoSyncEnabled: e.target.checked })}
+              className="w-5 h-5"
+            />
+            <label htmlFor="gravityAutoSync" className="text-sm font-semibold">
+              Enable automatic sync with Gravity HMS
+            </label>
+          </div>
+          <div>
+            <label className="label">Gravity Sync Interval (minutes)</label>
+            <select
+              value={settings.gravitySyncIntervalMinutes}
+              onChange={(e) => setSettings({ ...settings, gravitySyncIntervalMinutes: parseInt(e.target.value) })}
+              className="input"
+              disabled={!settings.gravityAutoSyncEnabled}
+            >
+              <option value="1">1 minute</option>
+              <option value="2">2 minutes (recommended)</option>
+              <option value="5">5 minutes</option>
+              <option value="10">10 minutes</option>
+            </select>
+          </div>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
+            <p className="text-blue-800">
+              <strong>Note:</strong> Real-time appointment sync ensures that walk-ins and appointments
+              created in Gravity HMS are immediately available in your EMR for consultations.
+            </p>
           </div>
         </div>
       </div>

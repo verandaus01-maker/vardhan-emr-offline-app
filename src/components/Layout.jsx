@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import {
   Activity, Calendar, FileText, Home, Settings as SettingsIcon,
-  Users, Wifi, WifiOff, RefreshCw, Database, Menu, X
+  Users, Wifi, WifiOff, RefreshCw, Database, Menu, X, FlaskConical
 } from 'lucide-react';
 import syncService from '../services/syncService';
 import DatabaseService from '../services/database';
@@ -88,6 +88,7 @@ function Layout() {
     { path: '/', icon: Home, label: 'Dashboard' },
     { path: '/patients', icon: Users, label: 'Patients' },
     { path: '/appointments', icon: Calendar, label: 'Appointments' },
+    { path: '/lab-reports', icon: FlaskConical, label: 'Lab Reports' },
     { path: '/reports', icon: FileText, label: 'Reports' },
     { path: '/data-migration', icon: Database, label: 'Data Migration' },
     { path: '/settings', icon: SettingsIcon, label: 'Settings' },

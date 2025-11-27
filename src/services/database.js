@@ -29,6 +29,11 @@ db.version(1).stores({
   backups: '++id, timestamp, size, status, filename'
 });
 
+// Version 2: Add alerts table for critical findings
+db.version(2).stores({
+  alerts: '++id, type, patientId, priority, read, createdAt'
+});
+
 // Database helper functions
 export class DatabaseService {
   // Patient operations

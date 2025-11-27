@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import DatabaseService from './services/database';
 import syncService from './services/syncService';
+import gravityService from './services/gravityService';
+import reportAnalysisService from './services/reportAnalysisService';
 
 // Layout
 import Layout from './components/Layout';
@@ -16,6 +18,8 @@ import Appointments from './pages/Appointments';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import DataMigration from './pages/DataMigration';
+import OnlineBooking from './pages/OnlineBooking';
+import LabReports from './pages/LabReports';
 
 function App() {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -34,6 +38,12 @@ function App() {
 
       // Initialize sync service
       await syncService.initialize();
+
+      // Initialize Gravity service for appointment sync
+      await gravityService.initialize();
+
+      // Initialize report analysis service
+      await reportAnalysisService.initialize();
 
       // Check if this is first run
       const isFirstRun = await DatabaseService.getSetting('isFirstRun');
@@ -162,6 +172,10 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Public routes (patient-facing) */}
+        <Route path="/book-appointment" element={<OnlineBooking />} />
+
+        {/* Protected routes (staff/doctor-facing) */}
         <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />
           <Route path="patients" element={<PatientSearch />} />
@@ -169,6 +183,7 @@ function App() {
           <Route path="prescription/:patientId" element={<PrescriptionWriter />} />
           <Route path="vitals/:patientId" element={<VitalsRecorder />} />
           <Route path="appointments" element={<Appointments />} />
+          <Route path="lab-reports" element={<LabReports />} />
           <Route path="reports" element={<Reports />} />
           <Route path="settings" element={<Settings />} />
           <Route path="data-migration" element={<DataMigration />} />
