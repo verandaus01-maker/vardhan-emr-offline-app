@@ -34,6 +34,11 @@ db.version(2).stores({
   alerts: '++id, type, patientId, priority, read, createdAt'
 });
 
+// Version 3: Add users table for authentication and authorization
+db.version(3).stores({
+  users: '++id, &username, email, role, isActive, createdAt, lastLogin'
+});
+
 // Database helper functions
 export class DatabaseService {
   // Patient operations

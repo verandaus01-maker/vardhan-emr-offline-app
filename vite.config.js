@@ -9,15 +9,16 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'logo192.png', 'logo512.png'],
       manifest: {
-        name: 'Vardhan Hospital EMR - Offline',
-        short_name: 'Vardhan EMR',
-        description: 'Complete Offline EMR System for Vardhan Hospital',
+        name: 'MediVoyager Pro - Intelligent EMR by NexaVoyagers',
+        short_name: 'MediVoyager Pro',
+        description: 'Intelligent Offline EMR System with AI Lab Analysis, Gravity Sync & Online Booking',
         theme_color: '#2563eb',
         background_color: '#ffffff',
         display: 'standalone',
-        orientation: 'landscape',
+        orientation: 'any',
         scope: '/',
         start_url: '/',
+        categories: ['medical', 'productivity', 'health'],
         icons: [
           {
             src: 'logo192.png',

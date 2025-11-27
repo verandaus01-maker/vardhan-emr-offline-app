@@ -1,7 +1,7 @@
 {
-  "name": "vardhan-emr-offline-app",
+  "name": "medivoyager-pro",
   "version": "1.0.0",
-  "description": "Offline-capable EMR system for Vardhan Hospital with Doc On sync",
+  "description": "MediVoyager Pro - Intelligent Offline EMR by NexaVoyagers with AI Lab Analysis, Gravity Sync & Online Booking",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -18,10 +18,14 @@
     "hospital",
     "offline",
     "PWA",
-    "medical"
+    "medical",
+    "AI",
+    "lab-analysis",
+    "NexaVoyagers",
+    "MediVoyager"
   ],
-  "author": "Vardhan Hospital",
-  "license": "ISC",
+  "author": "NexaVoyagers Technologies Pvt. Ltd.",
+  "license": "PROPRIETARY",
   "devDependencies": {
     "@vitejs/plugin-react": "^5.1.1",
     "autoprefixer": "^10.4.22",
@@ -32,6 +36,7 @@
     "workbox-window": "^7.3.0"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "date-fns": "^4.1.0",
     "dexie": "^4.2.1",
     "dexie-react-hooks": "^4.2.0",

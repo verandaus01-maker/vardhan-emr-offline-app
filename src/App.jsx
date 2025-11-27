@@ -4,11 +4,13 @@ import DatabaseService from './services/database';
 import syncService from './services/syncService';
 import gravityService from './services/gravityService';
 import reportAnalysisService from './services/reportAnalysisService';
+import authService from './services/authService';
 
 // Layout
 import Layout from './components/Layout';
 
 // Pages
+import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import PatientSearch from './pages/PatientSearch';
 import PatientDetails from './pages/PatientDetails';
@@ -20,10 +22,12 @@ import Settings from './pages/Settings';
 import DataMigration from './pages/DataMigration';
 import OnlineBooking from './pages/OnlineBooking';
 import LabReports from './pages/LabReports';
+import UserManagement from './pages/UserManagement';
 
 function App() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [initError, setInitError] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
     initializeApp();
@@ -35,6 +39,15 @@ function App() {
 
       // Initialize database
       await DatabaseService.getStats();
+
+      // Initialize authentication service
+      await authService.initialize();
+
+      // Check if user is already logged in
+      const user = authService.getCurrentUser();
+      if (user) {
+        setCurrentUser(user);
+      }
 
       // Initialize sync service
       await syncService.initialize();
@@ -169,26 +182,47 @@ function App() {
     );
   }
 
+  // Check if user is authenticated
+  const isAuthenticated = authService.isAuthenticated;
+
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public routes (patient-facing) */}
+        {/* Public routes */}
         <Route path="/book-appointment" element={<OnlineBooking />} />
+        <Route
+          path="/login"
+          element={
+            isAuthenticated ?
+            <Navigate to="/" replace /> :
+            <Login onLoginSuccess={(user) => setCurrentUser(user)} />
+          }
+        />
 
         {/* Protected routes (staff/doctor-facing) */}
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="patients" element={<PatientSearch />} />
-          <Route path="patients/:patientId" element={<PatientDetails />} />
-          <Route path="prescription/:patientId" element={<PrescriptionWriter />} />
-          <Route path="vitals/:patientId" element={<VitalsRecorder />} />
-          <Route path="appointments" element={<Appointments />} />
-          <Route path="lab-reports" element={<LabReports />} />
-          <Route path="reports" element={<Reports />} />
-          <Route path="settings" element={<Settings />} />
-          <Route path="data-migration" element={<DataMigration />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Route>
+        {!isAuthenticated ? (
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        ) : (
+          <Route path="/" element={<Layout currentUser={currentUser} onLogout={() => {
+            authService.logout();
+            setCurrentUser(null);
+          }} />}>
+            <Route index element={<Dashboard />} />
+            <Route path="patients" element={<PatientSearch />} />
+            <Route path="patients/:patientId" element={<PatientDetails />} />
+            <Route path="prescription/:patientId" element={<PrescriptionWriter />} />
+            <Route path="vitals/:patientId" element={<VitalsRecorder />} />
+            <Route path="appointments" element={<Appointments />} />
+            <Route path="lab-reports" element={<LabReports />} />
+            <Route path="reports" element={<Reports />} />
+            <Route path="settings" element={<Settings />} />
+            <Route path="data-migration" element={<DataMigration />} />
+            {authService.hasRole('admin') && (
+              <Route path="user-management" element={<UserManagement />} />
+            )}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
+        )}
       </Routes>
     </BrowserRouter>
   );

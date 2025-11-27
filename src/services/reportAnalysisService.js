@@ -66,6 +66,19 @@ const NORMAL_RANGES = {
 };
 
 class ReportAnalysisService {
+  constructor() {
+    this.isInitialized = false;
+  }
+
+  /**
+   * Initialize the service
+   */
+  async initialize() {
+    console.log('Initializing Report Analysis Service...');
+    this.isInitialized = true;
+    console.log('Report Analysis Service initialized');
+  }
+
   /**
    * Analyze lab report and detect abnormalities
    */

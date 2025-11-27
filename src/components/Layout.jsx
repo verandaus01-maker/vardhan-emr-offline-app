@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import {
   Activity, Calendar, FileText, Home, Settings as SettingsIcon,
-  Users, Wifi, WifiOff, RefreshCw, Database, Menu, X, FlaskConical
+  Users, Wifi, WifiOff, RefreshCw, Database, Menu, X, FlaskConical, LogOut, Shield
 } from 'lucide-react';
 import syncService from '../services/syncService';
 import DatabaseService from '../services/database';
+import authService from '../services/authService';
 
-function Layout() {
+function Layout({ currentUser, onLogout }) {
   const location = useLocation();
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -94,6 +95,11 @@ function Layout() {
     { path: '/settings', icon: SettingsIcon, label: 'Settings' },
   ];
 
+  // Add User Management for admin users
+  if (authService.hasRole('admin')) {
+    navItems.push({ path: '/user-management', icon: Shield, label: 'User Management' });
+  }
+
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
@@ -111,8 +117,8 @@ function Layout() {
               <div className="flex items-center space-x-3">
                 <Activity className="w-10 h-10" />
                 <div>
-                  <h1 className="text-2xl font-bold">Vardhan Hospital EMR</h1>
-                  <p className="text-blue-200 text-xs">Electronic Medical Records - Offline Capable</p>
+                  <h1 className="text-2xl font-bold">MediVoyager Pro</h1>
+                  <p className="text-blue-200 text-xs">by NexaVoyagers • Intelligent Offline EMR</p>
                 </div>
               </div>
             </div>
@@ -155,13 +161,22 @@ function Layout() {
                 </div>
               </button>
 
-              {/* Doctor Info */}
-              <div className="hidden md:block text-right">
-                <p className="font-semibold">Dr. Vivek Raj Singh</p>
-                <p className="text-sm text-blue-200">MD Cardiology</p>
-              </div>
-              <div className="w-10 h-10 bg-blue-700 rounded-full flex items-center justify-center font-bold text-lg">
-                VR
+              {/* User Info */}
+              <div className="hidden md:flex items-center space-x-3">
+                <div className="text-right">
+                  <p className="font-semibold">{currentUser?.name || 'User'}</p>
+                  <p className="text-sm text-blue-200">{authService.getRoleDisplayName(currentUser?.role || 'staff')}</p>
+                </div>
+                <div className="w-10 h-10 bg-blue-700 rounded-full flex items-center justify-center font-bold text-lg">
+                  {currentUser?.name?.charAt(0) || 'U'}
+                </div>
+                <button
+                  onClick={onLogout}
+                  className="p-2 hover:bg-blue-700 rounded-lg transition"
+                  title="Logout"
+                >
+                  <LogOut className="w-5 h-5" />
+                </button>
               </div>
             </div>
           </div>
