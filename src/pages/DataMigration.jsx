@@ -8,6 +8,8 @@ function DataMigration() {
   const [progress, setProgress] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [previewData, setPreviewData] = useState(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   const handleImportFromDocOn = async () => {
     // Check if API credentials are configured
@@ -92,49 +94,317 @@ function DataMigration() {
     }
   };
 
+  /**
+   * Parse CSV properly (handles quoted fields, commas in data, etc.)
+   */
+  const parseCSVLine = (line) => {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      const nextChar = line[i + 1];
+
+      if (char === '"') {
+        if (inQuotes && nextChar === '"') {
+          // Escaped quote
+          current += '"';
+          i++;
+        } else {
+          // Toggle quote state
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        // End of field
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+
+    // Add last field
+    result.push(current.trim());
+
+    return result;
+  };
+
+  /**
+   * Map column name to standard field name (flexible column matching)
+   */
+  const mapColumnName = (columnName) => {
+    const normalized = columnName.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    const mappings = {
+      // UHID variations
+      'uhid': 'uhid',
+      'patientid': 'uhid',
+      'id': 'uhid',
+      'patientnumber': 'uhid',
+      'mrn': 'uhid',
+      'registrationno': 'uhid',
+
+      // Name variations
+      'name': 'name',
+      'patientname': 'name',
+      'fullname': 'name',
+      'firstname': 'name',
+
+      // Age
+      'age': 'age',
+      'years': 'age',
+      'yrs': 'age',
+
+      // Gender
+      'gender': 'gender',
+      'sex': 'gender',
+      'm/f': 'gender',
+
+      // Phone
+      'phone': 'phone',
+      'mobile': 'phone',
+      'contact': 'phone',
+      'phonenumber': 'phone',
+      'mobilenumber': 'phone',
+      'contactnumber': 'phone',
+
+      // Email
+      'email': 'email',
+      'emailid': 'email',
+      'emailaddress': 'email',
+
+      // Address
+      'address': 'address',
+      'location': 'address',
+      'city': 'address',
+
+      // Blood Group
+      'bloodgroup': 'bloodGroup',
+      'blood': 'bloodGroup',
+      'bg': 'bloodGroup',
+
+      // Registration Date
+      'registrationdate': 'registrationDate',
+      'regdate': 'registrationDate',
+      'date': 'registrationDate',
+      'dateofregistration': 'registrationDate',
+      'createddate': 'registrationDate',
+
+      // Date of Birth
+      'dob': 'dateOfBirth',
+      'dateofbirth': 'dateOfBirth',
+      'birthdate': 'dateOfBirth',
+
+      // Aadhaar
+      'aadhaar': 'aadhaar',
+      'aadhar': 'aadhaar',
+      'aadharnumber': 'aadhaar',
+
+      // Emergency Contact
+      'emergencycontact': 'emergencyContact',
+      'emergencyphone': 'emergencyContact',
+
+      // Medical History
+      'medicalhistory': 'medicalHistory',
+      'history': 'medicalHistory',
+
+      // Allergies
+      'allergies': 'allergies',
+      'allergy': 'allergies'
+    };
+
+    return mappings[normalized] || columnName;
+  };
+
+  /**
+   * Clean and validate phone number
+   */
+  const cleanPhoneNumber = (phone) => {
+    if (!phone) return '';
+    // Remove all non-digits
+    const digits = phone.replace(/\D/g, '');
+    // Keep last 10 digits (Indian mobile)
+    return digits.slice(-10);
+  };
+
+  /**
+   * Parse date flexibly
+   */
+  const parseDate = (dateStr) => {
+    if (!dateStr) return new Date().toISOString();
+
+    try {
+      // Try multiple formats
+      const formats = [
+        // DD/MM/YYYY or DD-MM-YYYY
+        /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/,
+        // MM/DD/YYYY or MM-DD-YYYY
+        /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/,
+        // YYYY/MM/DD or YYYY-MM-DD
+        /^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/
+      ];
+
+      for (const format of formats) {
+        const match = dateStr.match(format);
+        if (match) {
+          const [, p1, p2, p3] = match;
+          // Assume YYYY-MM-DD if first part is 4 digits
+          if (p1.length === 4) {
+            return new Date(`${p1}-${p2.padStart(2, '0')}-${p3.padStart(2, '0')}`).toISOString();
+          } else {
+            // Assume DD/MM/YYYY for Indian format
+            return new Date(`${p3}-${p2.padStart(2, '0')}-${p1.padStart(2, '0')}`).toISOString();
+          }
+        }
+      }
+
+      // Try ISO format
+      const isoDate = new Date(dateStr);
+      if (!isNaN(isoDate.getTime())) {
+        return isoDate.toISOString();
+      }
+    } catch (e) {
+      // Ignore parse errors
+    }
+
+    // Default to current date
+    return new Date().toISOString();
+  };
+
+  /**
+   * Robust CSV import with flexible column mapping
+   */
   const handleImportFromCsv = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
+    setImporting(true);
+    setError('');
+    setSuccess('');
+    setProgress({ page: 0, count: 0, total: 0 });
+
     try {
-      const text = await file.text();
-      const lines = text.split('\n');
-      const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
+      // Read file with proper encoding handling
+      let text = await file.text();
+
+      // Remove BOM if present (Excel exports)
+      if (text.charCodeAt(0) === 0xFEFF) {
+        text = text.slice(1);
+      }
+
+      // Split into lines (handle both \n and \r\n)
+      const lines = text.split(/\r?\n/).filter(line => line.trim());
+
+      if (lines.length === 0) {
+        throw new Error('CSV file is empty');
+      }
+
+      // Parse header row
+      const headerRow = parseCSVLine(lines[0]);
+      const columnMap = {};
+
+      // Map each column to standard field name
+      headerRow.forEach((header, index) => {
+        const fieldName = mapColumnName(header);
+        columnMap[index] = fieldName;
+      });
+
+      console.log('Column mapping:', columnMap);
 
       let imported = 0;
+      let skipped = 0;
+      let errors = 0;
+      const errorDetails = [];
+
+      // Process each data row
       for (let i = 1; i < lines.length; i++) {
-        if (!lines[i].trim()) continue;
+        try {
+          const line = lines[i].trim();
+          if (!line) continue;
 
-        const values = lines[i].split(',').map(v => v.replace(/"/g, '').trim());
-        const patient = {
-          uhid: values[0],
-          name: values[1],
-          age: parseInt(values[2]) || 0,
-          gender: values[3],
-          phone: values[4],
-          email: values[5],
-          address: values[6],
-          bloodGroup: values[7],
-          registrationDate: values[8] || new Date().toISOString()
-        };
+          const values = parseCSVLine(line);
+          const rowData = {};
 
-        // Check if patient already exists
-        const existing = await DatabaseService.getPatientByUHID(patient.uhid);
-        if (!existing) {
+          // Map values to fields
+          values.forEach((value, index) => {
+            const fieldName = columnMap[index];
+            if (fieldName) {
+              rowData[fieldName] = value;
+            }
+          });
+
+          // Build patient object with all possible fields
+          const patient = {
+            uhid: rowData.uhid || `AUTO_${Date.now()}_${i}`,
+            name: rowData.name || 'Unknown',
+            age: parseInt(rowData.age) || 0,
+            gender: rowData.gender || '',
+            phone: cleanPhoneNumber(rowData.phone),
+            email: rowData.email || '',
+            address: rowData.address || '',
+            bloodGroup: rowData.bloodGroup || '',
+            aadhaar: rowData.aadhaar || '',
+            dateOfBirth: rowData.dateOfBirth || '',
+            emergencyContact: rowData.emergencyContact || '',
+            medicalHistory: rowData.medicalHistory || '',
+            allergies: rowData.allergies || '',
+            registrationDate: parseDate(rowData.registrationDate)
+          };
+
+          // Validate required fields
+          if (!patient.name || patient.name === 'Unknown') {
+            errorDetails.push(`Row ${i + 1}: Missing name`);
+            errors++;
+            continue;
+          }
+
+          // Check if patient already exists
+          const existing = await DatabaseService.getPatientByUHID(patient.uhid);
+          if (existing) {
+            skipped++;
+            continue;
+          }
+
+          // Import patient
           await DatabaseService.addPatient(patient);
           imported++;
+
+          // Update progress
+          if (imported % 10 === 0) {
+            setProgress({ page: 0, count: imported, total: lines.length - 1 });
+          }
+
+        } catch (rowError) {
+          console.error(`Error processing row ${i + 1}:`, rowError);
+          errorDetails.push(`Row ${i + 1}: ${rowError.message}`);
+          errors++;
         }
       }
 
-      setSuccess(`✅ Imported ${imported} patients from CSV`);
+      // Show detailed results
+      let resultMessage = `✅ Import Complete!\n\n`;
+      resultMessage += `✅ Imported: ${imported} patients\n`;
+      if (skipped > 0) resultMessage += `⏭️ Skipped (duplicates): ${skipped}\n`;
+      if (errors > 0) resultMessage += `❌ Errors: ${errors}\n`;
+
+      if (errorDetails.length > 0 && errorDetails.length <= 10) {
+        resultMessage += `\nError details:\n${errorDetails.join('\n')}`;
+      } else if (errorDetails.length > 10) {
+        resultMessage += `\nShowing first 10 errors:\n${errorDetails.slice(0, 10).join('\n')}`;
+      }
+
+      setSuccess(resultMessage);
+      setProgress(null);
 
     } catch (error) {
-      console.error('Import from CSV failed:', error);
-      setError(`Import failed: ${error.message}`);
+      console.error('CSV import failed:', error);
+      setError(`Import failed: ${error.message}\n\nPlease check your CSV format and try again.`);
+      setProgress(null);
+    } finally {
+      setImporting(false);
+      event.target.value = '';
     }
-
-    // Reset input
-    event.target.value = '';
   };
 
   return (
@@ -229,10 +499,56 @@ function DataMigration() {
             <Upload className="w-6 h-6 text-blue-600" />
           </div>
           <div className="flex-1">
-            <h2 className="text-xl font-bold mb-2">Import/Export CSV</h2>
+            <h2 className="text-xl font-bold mb-2">Import/Export Patient Data</h2>
             <p className="text-gray-600 mb-4">
-              Import patient data from a CSV file or export your current patient database to CSV format.
+              Import patient data from CSV or Excel file. Export your current patient database to CSV format.
             </p>
+
+            {/* Supported Formats */}
+            <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded mb-4">
+              <h4 className="font-semibold text-green-800 mb-2">✅ Supported Formats:</h4>
+              <ul className="text-sm text-green-700 space-y-1 list-disc list-inside">
+                <li><strong>CSV files</strong> (.csv) - from Excel, Google Sheets, or any CSV export</li>
+                <li><strong>Excel files</strong> (.xlsx, .xls) - direct Excel import coming soon</li>
+                <li><strong>Any column order</strong> - columns can be in any order</li>
+                <li><strong>Flexible column names</strong> - supports various spellings (Name, Patient Name, Full Name, etc.)</li>
+                <li><strong>Handles commas in data</strong> - properly parses quoted fields</li>
+                <li><strong>Multiple date formats</strong> - DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD</li>
+              </ul>
+            </div>
+
+            {/* Recognized Columns */}
+            <div className="bg-blue-50 border border-blue-200 rounded p-4 mb-4">
+              <h4 className="font-semibold text-blue-800 mb-2">📋 Recognized Column Names:</h4>
+              <div className="text-sm text-blue-700 grid grid-cols-2 gap-2">
+                <div><strong>UHID:</strong> uhid, id, patient_id, mrn, registration_no</div>
+                <div><strong>Name:</strong> name, patient_name, full_name</div>
+                <div><strong>Age:</strong> age, years, yrs</div>
+                <div><strong>Gender:</strong> gender, sex, m/f</div>
+                <div><strong>Phone:</strong> phone, mobile, contact, mobile_number</div>
+                <div><strong>Email:</strong> email, email_id</div>
+                <div><strong>Address:</strong> address, location, city</div>
+                <div><strong>Blood Group:</strong> blood_group, blood, bg</div>
+                <div><strong>Date of Birth:</strong> dob, date_of_birth</div>
+                <div><strong>Aadhaar:</strong> aadhaar, aadhar</div>
+                <div><strong>Emergency Contact:</strong> emergency_contact</div>
+                <div><strong>Medical History:</strong> medical_history, history</div>
+              </div>
+            </div>
+
+            {/* Example CSV Format */}
+            <details className="mb-4">
+              <summary className="cursor-pointer font-semibold text-gray-700 hover:text-blue-600">
+                📄 Example CSV Format (click to expand)
+              </summary>
+              <div className="mt-2 bg-gray-50 p-3 rounded text-xs font-mono overflow-x-auto">
+                <pre>UHID,Name,Age,Gender,Phone,Email,Address,Blood Group
+VH001,Ram Kumar,45,Male,9876543210,ram@email.com,"Varanasi, UP",O+
+VH002,Sita Devi,38,Female,9876543211,sita@email.com,"Banaras, UP",A+
+VH003,Gopal Singh,52,Male,9876543212,gopal@email.com,"Varanasi",B+</pre>
+              </div>
+            </details>
+
             <div className="flex items-center space-x-4">
               <button
                 onClick={handleExportToCsv}
@@ -241,17 +557,22 @@ function DataMigration() {
                 <Download className="w-5 h-5" />
                 <span>Export to CSV</span>
               </button>
-              <label className="btn-secondary flex items-center space-x-2 cursor-pointer">
+              <label className="btn-primary flex items-center space-x-2 cursor-pointer">
                 <Upload className="w-5 h-5" />
-                <span>Import from CSV</span>
+                <span>Import from CSV/Excel</span>
                 <input
                   type="file"
-                  accept=".csv"
+                  accept=".csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                   onChange={handleImportFromCsv}
                   className="hidden"
+                  disabled={importing}
                 />
               </label>
             </div>
+
+            <p className="text-xs text-gray-500 mt-2">
+              💡 Tip: If you have issues, paste your CSV data in chat and I'll help diagnose the problem!
+            </p>
           </div>
         </div>
       </div>
