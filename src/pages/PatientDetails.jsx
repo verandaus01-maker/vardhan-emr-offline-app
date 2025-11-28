@@ -25,30 +25,56 @@ function PatientDetails() {
 
   const loadPatientData = async () => {
     try {
-      const patientData = await DatabaseService.getPatient(parseInt(patientId));
+      console.log('Loading patient data for ID:', patientId);
+
+      // Try to get patient by numeric ID first
+      let patientData = null;
+      const numericId = parseInt(patientId);
+
+      if (!isNaN(numericId)) {
+        patientData = await DatabaseService.db.patients.get(numericId);
+        console.log('Patient lookup by ID:', numericId, patientData ? 'Found' : 'Not found');
+      }
+
+      // If not found by ID, try by UHID
       if (!patientData) {
-        navigate('/patients');
+        patientData = await DatabaseService.db.patients.where('uhid').equals(patientId).first();
+        console.log('Patient lookup by UHID:', patientId, patientData ? 'Found' : 'Not found');
+      }
+
+      if (!patientData) {
+        console.error('Patient not found for ID/UHID:', patientId);
+        setLoading(false);
+        setPatient(null);
         return;
       }
 
-      // Load all related data
-      const patientPrescriptions = await DatabaseService.db.prescriptions
-        .where('patientId')
-        .equals(parseInt(patientId))
-        .reverse()
-        .sortBy('createdAt');
+      console.log('Patient found:', patientData.name, 'ID:', patientData.id);
 
-      const patientVitals = await DatabaseService.db.vitals
-        .where('patientId')
-        .equals(parseInt(patientId))
-        .reverse()
-        .sortBy('createdAt');
+      // Load all related data using the patient's database ID
+      const [patientPrescriptions, patientVitals, patientLabReports] = await Promise.all([
+        DatabaseService.db.prescriptions
+          .where('patientId')
+          .equals(patientData.id)
+          .reverse()
+          .sortBy('createdAt'),
+        DatabaseService.db.vitals
+          .where('patientId')
+          .equals(patientData.id)
+          .reverse()
+          .sortBy('createdAt'),
+        DatabaseService.db.labReports
+          .where('patientId')
+          .equals(patientData.id)
+          .reverse()
+          .sortBy('createdAt')
+      ]);
 
-      const patientLabReports = await DatabaseService.db.labReports
-        .where('patientId')
-        .equals(parseInt(patientId))
-        .reverse()
-        .sortBy('createdAt');
+      console.log('Data loaded:', {
+        prescriptions: patientPrescriptions.length,
+        vitals: patientVitals.length,
+        labReports: patientLabReports.length
+      });
 
       setPatient(patientData);
       setPrescriptions(patientPrescriptions);
@@ -56,7 +82,8 @@ function PatientDetails() {
       setLabReports(patientLabReports);
       setLoading(false);
     } catch (error) {
-      console.error('Failed to load patient:', error);
+      console.error('Failed to load patient data:', error);
+      setPatient(null);
       setLoading(false);
     }
   };

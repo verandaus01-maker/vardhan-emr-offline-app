@@ -73,18 +73,46 @@ export class DatabaseService {
   }
 
   static async searchPatients(query) {
-    const lowerQuery = query.toLowerCase();
+    const lowerQuery = query.toLowerCase().trim();
+    const results = new Map(); // Use Map to avoid duplicates
 
-    // Search by multiple fields
-    const results = await db.patients.filter(patient =>
-      patient.name?.toLowerCase().includes(lowerQuery) ||
-      patient.uhid?.toLowerCase().includes(lowerQuery) ||
-      patient.phone?.includes(query) ||
-      patient.aadhaar?.includes(query) ||
-      patient.email?.toLowerCase().includes(lowerQuery)
-    ).toArray();
+    try {
+      // Fast indexed search by UHID (exact match)
+      if (query.length >= 2) {
+        const uhidMatches = await db.patients
+          .where('uhid')
+          .startsWithIgnoreCase(query)
+          .limit(50)
+          .toArray();
+        uhidMatches.forEach(p => results.set(p.id, p));
+      }
 
-    return results;
+      // Fast indexed search by phone (starts with)
+      if (/^\d/.test(query)) {
+        const phoneMatches = await db.patients
+          .where('phone')
+          .startsWith(query)
+          .limit(50)
+          .toArray();
+        phoneMatches.forEach(p => results.set(p.id, p));
+      }
+
+      // Name search with filter (for partial matches)
+      if (query.length >= 2 && results.size < 50) {
+        const nameMatches = await db.patients
+          .filter(patient =>
+            patient.name?.toLowerCase().includes(lowerQuery)
+          )
+          .limit(50)
+          .toArray();
+        nameMatches.forEach(p => results.set(p.id, p));
+      }
+
+      return Array.from(results.values()).slice(0, 50);
+    } catch (error) {
+      console.error('Search error:', error);
+      return [];
+    }
   }
 
   static async getAllPatients(limit = 100, offset = 0) {
