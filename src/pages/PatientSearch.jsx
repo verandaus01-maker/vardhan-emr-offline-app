@@ -52,9 +52,19 @@ function PatientSearch() {
       .toUpperCase()
       .slice(0, 2);
 
+    const handleClick = () => {
+      console.log('Navigating to patient:', { id: patient.id, uhid: patient.uhid, name: patient.name });
+      if (!patient.id) {
+        console.error('WARNING: Patient has no ID!', patient);
+        alert(`Error: This patient record has no ID. UHID: ${patient.uhid}`);
+        return;
+      }
+      navigate(`/patients/${patient.id}`);
+    };
+
     return (
       <div
-        onClick={() => navigate(`/patients/${patient.id}`)}
+        onClick={handleClick}
         className="card hover:shadow-2xl hover:border-2 hover:border-blue-500 cursor-pointer transition-all"
       >
         <div className="flex items-center space-x-4">

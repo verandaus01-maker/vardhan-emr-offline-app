@@ -25,31 +25,45 @@ function PatientDetails() {
 
   const loadPatientData = async () => {
     try {
+      console.log('=== PATIENT DETAILS DEBUG ===');
       console.log('Loading patient data for ID:', patientId);
+      console.log('Type of patientId:', typeof patientId);
 
       // Try to get patient by numeric ID first
       let patientData = null;
       const numericId = parseInt(patientId);
 
       if (!isNaN(numericId)) {
+        console.log('Attempting to find patient by numeric ID:', numericId);
         patientData = await DatabaseService.db.patients.get(numericId);
-        console.log('Patient lookup by ID:', numericId, patientData ? 'Found' : 'Not found');
+        console.log('Patient lookup by ID result:', patientData);
       }
 
       // If not found by ID, try by UHID
       if (!patientData) {
+        console.log('Attempting to find patient by UHID:', patientId);
         patientData = await DatabaseService.db.patients.where('uhid').equals(patientId).first();
-        console.log('Patient lookup by UHID:', patientId, patientData ? 'Found' : 'Not found');
+        console.log('Patient lookup by UHID result:', patientData);
       }
 
+      // Last resort: try case-insensitive UHID search
       if (!patientData) {
-        console.error('Patient not found for ID/UHID:', patientId);
+        console.log('Attempting case-insensitive UHID search:', patientId);
+        patientData = await DatabaseService.db.patients.where('uhid').equalsIgnoreCase(patientId).first();
+        console.log('Patient lookup by case-insensitive UHID result:', patientData);
+      }
+
+      // Debug: Let's see what patients exist
+      if (!patientData) {
+        const allPatients = await DatabaseService.db.patients.limit(5).toArray();
+        console.log('Sample patients in database:', allPatients.map(p => ({ id: p.id, uhid: p.uhid, name: p.name })));
+        console.error('❌ Patient not found for ID/UHID:', patientId);
         setLoading(false);
         setPatient(null);
         return;
       }
 
-      console.log('Patient found:', patientData.name, 'ID:', patientData.id);
+      console.log('✅ Patient found:', patientData.name, 'ID:', patientData.id);
 
       // Load all related data using the patient's database ID
       const [patientPrescriptions, patientVitals, patientLabReports] = await Promise.all([
@@ -82,7 +96,7 @@ function PatientDetails() {
       setLabReports(patientLabReports);
       setLoading(false);
     } catch (error) {
-      console.error('Failed to load patient data:', error);
+      console.error('❌ Failed to load patient data:', error);
       setPatient(null);
       setLoading(false);
     }
@@ -133,11 +147,35 @@ function PatientDetails() {
 
   if (!patient) {
     return (
-      <div className="card text-center py-12">
-        <p className="text-gray-600">Patient not found</p>
-        <Link to="/patients" className="btn-primary mt-4">
-          Back to Patients
-        </Link>
+      <div className="space-y-6 fade-in">
+        <button
+          onClick={() => navigate('/patients')}
+          className="flex items-center space-x-2 text-gray-600 hover:text-gray-800"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          <span>Back to Patients</span>
+        </button>
+
+        <div className="card text-center py-12">
+          <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Patient Not Found</h2>
+          <p className="text-gray-600 mb-4">
+            Unable to find patient with ID: <code className="bg-gray-100 px-2 py-1 rounded">{patientId}</code>
+          </p>
+          <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-lg text-left max-w-2xl mx-auto mb-6">
+            <h3 className="font-semibold text-yellow-800 mb-2">Troubleshooting Steps:</h3>
+            <ol className="text-sm text-yellow-700 space-y-1 list-decimal list-inside">
+              <li>Open browser console (F12) to see detailed debug information</li>
+              <li>Check if you have imported patient data using Doc On Importer</li>
+              <li>Try searching for the patient from the Patients page</li>
+              <li>Verify that the patient exists in the database</li>
+            </ol>
+          </div>
+          <Link to="/patients" className="btn-primary inline-flex items-center space-x-2">
+            <ArrowLeft className="w-5 h-5" />
+            <span>Back to Patient Search</span>
+          </Link>
+        </div>
       </div>
     );
   }
