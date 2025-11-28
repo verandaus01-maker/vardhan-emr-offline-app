@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Save, Database, Download, Upload } from 'lucide-react';
+import { Settings as SettingsIcon, Save, Database, Download, Upload, Shield, CheckCircle, AlertTriangle } from 'lucide-react';
 import DatabaseService from '../services/database';
+import licenseService from '../services/licenseService';
 
 function Settings() {
   const [settings, setSettings] = useState({
@@ -19,10 +20,17 @@ function Settings() {
   });
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [licenseInfo, setLicenseInfo] = useState(null);
 
   useEffect(() => {
     loadSettings();
+    loadLicense();
   }, []);
+
+  const loadLicense = () => {
+    const license = licenseService.getLicenseDisplay();
+    setLicenseInfo(license);
+  };
 
   const loadSettings = async () => {
     const loadedSettings = {
@@ -152,6 +160,117 @@ function Settings() {
           </div>
         </div>
       </div>
+
+      {/* License Information */}
+      {licenseInfo && (
+        <div className="card">
+          <h2 className="text-xl font-bold mb-4 flex items-center space-x-2">
+            <Shield className="w-6 h-6 text-blue-600" />
+            <span>License Information</span>
+          </h2>
+
+          <div className={`p-4 rounded-lg border-l-4 mb-4 ${
+            licenseInfo.status === 'valid'
+              ? licenseInfo.color === 'green'
+                ? 'bg-green-50 border-green-500'
+                : 'bg-yellow-50 border-yellow-500'
+              : 'bg-red-50 border-red-500'
+          }`}>
+            <div className="flex items-start space-x-3">
+              {licenseInfo.status === 'valid' ? (
+                <CheckCircle className={`w-6 h-6 flex-shrink-0 ${
+                  licenseInfo.color === 'green' ? 'text-green-600' : 'text-yellow-600'
+                }`} />
+              ) : (
+                <AlertTriangle className="w-6 h-6 text-red-600 flex-shrink-0" />
+              )}
+              <div className="flex-1">
+                <p className={`font-semibold ${
+                  licenseInfo.status === 'valid'
+                    ? licenseInfo.color === 'green' ? 'text-green-800' : 'text-yellow-800'
+                    : 'text-red-800'
+                }`}>
+                  {licenseInfo.status === 'valid' ? 'License Valid' : 'License Issue'}
+                </p>
+                {licenseInfo.expiryWarning && (
+                  <p className="text-yellow-700 text-sm mt-1">
+                    ⚠️ {licenseInfo.expiryWarning}
+                  </p>
+                )}
+                {licenseInfo.message && (
+                  <p className="text-red-700 text-sm mt-1">
+                    {licenseInfo.message}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {licenseInfo.status === 'valid' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div className="space-y-2">
+                <div className="flex justify-between py-2 border-b border-gray-200">
+                  <span className="text-gray-600">Product:</span>
+                  <span className="font-semibold">{licenseInfo.productName}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-200">
+                  <span className="text-gray-600">Version:</span>
+                  <span className="font-semibold">v{licenseInfo.version}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-200">
+                  <span className="text-gray-600">Licensed To:</span>
+                  <span className="font-semibold">{licenseInfo.licensedTo}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-200">
+                  <span className="text-gray-600">Location:</span>
+                  <span className="font-semibold">{licenseInfo.location}</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between py-2 border-b border-gray-200">
+                  <span className="text-gray-600">License Type:</span>
+                  <span className="font-semibold">{licenseInfo.licenseType}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-200">
+                  <span className="text-gray-600">Max Users:</span>
+                  <span className="font-semibold">{licenseInfo.maxUsers} concurrent</span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-200">
+                  <span className="text-gray-600">Install Date:</span>
+                  <span className="font-semibold">
+                    {new Date(licenseInfo.installDate).toLocaleDateString()}
+                  </span>
+                </div>
+                <div className="flex justify-between py-2 border-b border-gray-200">
+                  <span className="text-gray-600">Expiry Date:</span>
+                  <span className={`font-semibold ${
+                    licenseInfo.expiringSoon ? 'text-yellow-600' : 'text-green-600'
+                  }`}>
+                    {new Date(licenseInfo.expiryDate).toLocaleDateString()}
+                    {licenseInfo.daysUntilExpiry && (
+                      <span className="text-xs ml-2">
+                        ({licenseInfo.daysUntilExpiry} days left)
+                      </span>
+                    )}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm">
+            <p className="text-blue-800 font-semibold">
+              Vendor: {licenseService.getSupportInfo().vendor}
+            </p>
+            <p className="text-blue-700 mt-1">
+              Support: {licenseService.getSupportInfo().email}
+            </p>
+            <p className="text-blue-600 text-xs mt-1">
+              {licenseService.getSupportInfo().supportHours}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Doc On Integration */}
       <div className="card">

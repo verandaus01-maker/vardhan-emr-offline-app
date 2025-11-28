@@ -5,6 +5,8 @@ import syncService from './services/syncService';
 import gravityService from './services/gravityService';
 import reportAnalysisService from './services/reportAnalysisService';
 import authService from './services/authService';
+import backupService from './services/backupService';
+import licenseService from './services/licenseService';
 
 // Layout
 import Layout from './components/Layout';
@@ -24,6 +26,7 @@ import OnlineBooking from './pages/OnlineBooking';
 import LabReports from './pages/LabReports';
 import UserManagement from './pages/UserManagement';
 import DocOnImporter from './pages/DocOnImporter';
+import BackupRestore from './pages/BackupRestore';
 
 function App() {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -58,6 +61,17 @@ function App() {
 
       // Initialize report analysis service
       await reportAnalysisService.initialize();
+
+      // CRITICAL: Initialize backup service to protect data
+      await backupService.initialize();
+
+      // Initialize license service
+      const licenseValidation = await licenseService.initialize();
+      if (!licenseValidation.valid) {
+        console.warn('⚠️ License issue:', licenseValidation.error);
+      } else if (licenseValidation.expiringSoon) {
+        console.warn('⚠️', licenseValidation.expiryWarning);
+      }
 
       // Check if this is first run
       const isFirstRun = await DatabaseService.getSetting('isFirstRun');
@@ -217,6 +231,7 @@ function App() {
             <Route path="lab-reports" element={<LabReports />} />
             <Route path="reports" element={<Reports />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="backup-restore" element={<BackupRestore />} />
             <Route path="docon-importer" element={<DocOnImporter />} />
             <Route path="data-migration" element={<DataMigration />} />
             {authService.hasRole('admin') && (

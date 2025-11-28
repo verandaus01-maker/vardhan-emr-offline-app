@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import {
   Activity, Calendar, FileText, Home, Settings as SettingsIcon,
-  Users, Wifi, WifiOff, RefreshCw, Database, Menu, X, FlaskConical, LogOut, Shield
+  Users, Wifi, WifiOff, RefreshCw, Database, Menu, X, FlaskConical, LogOut, Shield, HardDrive
 } from 'lucide-react';
 import syncService from '../services/syncService';
 import DatabaseService from '../services/database';
@@ -91,6 +91,7 @@ function Layout({ currentUser, onLogout }) {
     { path: '/appointments', icon: Calendar, label: 'Appointments' },
     { path: '/lab-reports', icon: FlaskConical, label: 'Lab Reports' },
     { path: '/reports', icon: FileText, label: 'Reports' },
+    { path: '/backup-restore', icon: HardDrive, label: 'Backup & Restore' },
     { path: '/docon-importer', icon: Database, label: 'Doc On Importer' },
     { path: '/data-migration', icon: Database, label: 'CSV Import' },
     { path: '/settings', icon: SettingsIcon, label: 'Settings' },

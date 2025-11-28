@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, UserPlus, Edit, Trash2, Shield, Key, CheckCircle, XCircle } from 'lucide-react';
 import authService from '../services/authService';
 import { db } from '../services/database';
+import licenseService from '../services/licenseService';
 
 function UserManagement() {
   const [users, setUsers] = useState([]);
@@ -44,6 +45,13 @@ function UserManagement() {
 
   const handleAddUser = async (e) => {
     e.preventDefault();
+
+    // Check license before adding user
+    const licenseCheck = licenseService.canAddUser(users.length);
+    if (!licenseCheck.allowed) {
+      alert('❌ Cannot add user: ' + licenseCheck.reason);
+      return;
+    }
 
     if (formData.password.length < 6) {
       alert('Password must be at least 6 characters');
