@@ -23,6 +23,7 @@ import DataMigration from './pages/DataMigration';
 import OnlineBooking from './pages/OnlineBooking';
 import LabReports from './pages/LabReports';
 import UserManagement from './pages/UserManagement';
+import DocOnImporter from './pages/DocOnImporter';
 
 function App() {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -216,6 +217,7 @@ function App() {
             <Route path="lab-reports" element={<LabReports />} />
             <Route path="reports" element={<Reports />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="docon-importer" element={<DocOnImporter />} />
             <Route path="data-migration" element={<DataMigration />} />
             {authService.hasRole('admin') && (
               <Route path="user-management" element={<UserManagement />} />

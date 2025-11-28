@@ -91,7 +91,8 @@ function Layout({ currentUser, onLogout }) {
     { path: '/appointments', icon: Calendar, label: 'Appointments' },
     { path: '/lab-reports', icon: FlaskConical, label: 'Lab Reports' },
     { path: '/reports', icon: FileText, label: 'Reports' },
-    { path: '/data-migration', icon: Database, label: 'Data Migration' },
+    { path: '/docon-importer', icon: Database, label: 'Doc On Importer' },
+    { path: '/data-migration', icon: Database, label: 'CSV Import' },
     { path: '/settings', icon: SettingsIcon, label: 'Settings' },
   ];
 
