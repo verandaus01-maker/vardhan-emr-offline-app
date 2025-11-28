@@ -1,7 +1,7 @@
 {
-  "name": "medivoyager-pro",
+  "name": "nexacare-pro",
   "version": "1.0.0",
-  "description": "MediVoyager Pro - Intelligent Offline EMR by NexaVoyagers with AI Lab Analysis, Gravity Sync & Online Booking",
+  "description": "NexaCare Pro - Next-Generation Intelligent EMR System by NexaVoyagers Technologies with AI-Powered Lab Analysis, Real-Time Sync & Patient Portal",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -15,16 +15,20 @@
   },
   "keywords": [
     "EMR",
-    "hospital",
-    "offline",
+    "EHR",
+    "hospital-management",
+    "offline-first",
     "PWA",
-    "medical",
-    "AI",
+    "medical-records",
+    "AI-powered",
     "lab-analysis",
+    "patient-portal",
     "NexaVoyagers",
-    "MediVoyager"
+    "NexaCare",
+    "healthcare-technology"
   ],
-  "author": "NexaVoyagers Technologies Pvt. Ltd.",
+  "author": "NexaVoyagers Technologies Pvt. Ltd. <contact@nexavoyagers.com>",
+  "copyright": "Copyright © 2024-2025 NexaVoyagers Technologies Pvt. Ltd. All Rights Reserved.",
   "license": "PROPRIETARY",
   "devDependencies": {
     "@vitejs/plugin-react": "^5.1.1",

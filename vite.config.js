@@ -9,16 +9,17 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'logo192.png', 'logo512.png'],
       manifest: {
-        name: 'MediVoyager Pro - Intelligent EMR by NexaVoyagers',
-        short_name: 'MediVoyager Pro',
-        description: 'Intelligent Offline EMR System with AI Lab Analysis, Gravity Sync & Online Booking',
+        name: 'NexaCare Pro - Next-Generation Intelligent EMR',
+        short_name: 'NexaCare Pro',
+        description: 'Professional Healthcare Management System by NexaVoyagers Technologies - AI-Powered Lab Analysis, Real-Time Sync & Patient Portal',
         theme_color: '#2563eb',
         background_color: '#ffffff',
         display: 'standalone',
         orientation: 'any',
         scope: '/',
         start_url: '/',
-        categories: ['medical', 'productivity', 'health'],
+        categories: ['medical', 'productivity', 'health', 'business'],
+        lang: 'en-US',
         icons: [
           {
             src: 'logo192.png',

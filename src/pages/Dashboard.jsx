@@ -103,12 +103,20 @@ function Dashboard() {
     <div className="space-y-6 fade-in">
       {/* Welcome Banner */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white rounded-xl p-8 shadow-xl">
-        <h1 className="text-3xl font-bold mb-2">
-          Welcome, Dr. Vivek Raj Singh
-        </h1>
-        <p className="text-blue-100">
-          {format(new Date(), 'EEEE, MMMM d, yyyy')} • Vardhan Hospital Cardiology Department
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">
+              Welcome, Dr. Vivek Raj Singh
+            </h1>
+            <p className="text-blue-100">
+              {format(new Date(), 'EEEE, MMMM d, yyyy')} • Vardhan Hospital Cardiology Department
+            </p>
+          </div>
+          <div className="hidden md:block text-right">
+            <p className="text-xl font-bold">NexaCare Pro</p>
+            <p className="text-blue-200 text-sm">Powered by NexaVoyagers</p>
+          </div>
+        </div>
       </div>
 
       {/* Stats Grid */}

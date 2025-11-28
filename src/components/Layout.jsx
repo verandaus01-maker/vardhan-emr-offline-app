@@ -118,8 +118,8 @@ function Layout({ currentUser, onLogout }) {
               <div className="flex items-center space-x-3">
                 <Activity className="w-10 h-10" />
                 <div>
-                  <h1 className="text-2xl font-bold">MediVoyager Pro</h1>
-                  <p className="text-blue-200 text-xs">by NexaVoyagers • Intelligent Offline EMR</p>
+                  <h1 className="text-2xl font-bold">NexaCare Pro</h1>
+                  <p className="text-blue-200 text-xs">by NexaVoyagers Technologies • Next-Gen EMR System</p>
                 </div>
               </div>
             </div>
@@ -233,7 +233,7 @@ function Layout({ currentUser, onLogout }) {
           </nav>
 
           {/* Sidebar Footer */}
-          <div className="p-4 border-t border-gray-200">
+          <div className="p-4 border-t border-gray-200 space-y-3">
             <div className="text-xs text-gray-500 space-y-1">
               <div className="flex justify-between">
                 <span>Prescriptions:</span>
@@ -246,6 +246,20 @@ function Layout({ currentUser, onLogout }) {
               <div className="flex justify-between">
                 <span>Appointments:</span>
                 <span className="font-semibold">{stats?.totalAppointments || 0}</span>
+              </div>
+            </div>
+
+            {/* Copyright & Version */}
+            <div className="pt-3 border-t border-gray-200">
+              <div className="text-center">
+                <p className="text-xs font-semibold text-gray-700">NexaCare Pro v1.0</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  © 2024-2025 NexaVoyagers Technologies Pvt. Ltd.
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">All Rights Reserved</p>
+                <div className="mt-2 px-2 py-1 bg-blue-50 rounded text-xs text-blue-700 font-semibold">
+                  Licensed Product
+                </div>
               </div>
             </div>
           </div>

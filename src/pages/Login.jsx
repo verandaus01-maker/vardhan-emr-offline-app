@@ -40,9 +40,12 @@ function Login({ onLoginSuccess }) {
           <div className="inline-flex items-center justify-center w-20 h-20 bg-white rounded-full mb-4 shadow-2xl">
             <Activity className="w-12 h-12 text-blue-600" />
           </div>
-          <h1 className="text-4xl font-bold text-white mb-2">MediVoyager Pro</h1>
-          <p className="text-blue-200 text-lg">by NexaVoyagers</p>
-          <p className="text-blue-300 text-sm mt-2">Intelligent Offline EMR System</p>
+          <h1 className="text-4xl font-bold text-white mb-2">NexaCare Pro</h1>
+          <p className="text-blue-200 text-lg font-semibold">by NexaVoyagers Technologies</p>
+          <p className="text-blue-300 text-sm mt-2">Next-Generation Intelligent EMR System</p>
+          <div className="mt-3 inline-block px-4 py-1 bg-blue-500 bg-opacity-30 rounded-full">
+            <p className="text-xs text-white font-semibold">AI-Powered • Real-Time Sync • Patient Portal</p>
+          </div>
         </div>
 
         {/* Login Card */}
@@ -121,10 +124,20 @@ function Login({ onLoginSuccess }) {
         </div>
 
         {/* Footer */}
-        <div className="text-center mt-6 text-blue-200 text-sm">
-          <p>© 2025 NexaVoyagers Technologies</p>
-          <p className="mt-1">MediVoyager Pro™ - All Rights Reserved</p>
-          <p className="mt-2 text-xs">License: Vardhan Hospital, Varanasi</p>
+        <div className="text-center mt-6 space-y-2">
+          <div className="bg-white bg-opacity-10 rounded-lg p-4">
+            <p className="text-white font-semibold">NexaCare Pro™ v1.0</p>
+            <p className="text-blue-200 text-sm mt-1">
+              © 2024-2025 NexaVoyagers Technologies Pvt. Ltd.
+            </p>
+            <p className="text-blue-300 text-xs mt-1">All Rights Reserved • Proprietary Software</p>
+            <div className="mt-3 pt-3 border-t border-blue-400 border-opacity-30">
+              <p className="text-xs text-blue-200">Licensed to: Vardhan Hospital, Varanasi</p>
+              <p className="text-xs text-blue-300 mt-1">
+                Unauthorized copying, distribution, or use is strictly prohibited
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
