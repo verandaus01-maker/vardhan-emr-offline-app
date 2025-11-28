@@ -41,6 +41,9 @@ db.version(3).stores({
 
 // Database helper functions
 export class DatabaseService {
+  // Expose db instance for direct access
+  static db = db;
+
   // Patient operations
   static async addPatient(patientData) {
     const patient = {

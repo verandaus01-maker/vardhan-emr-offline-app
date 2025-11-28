@@ -18,33 +18,57 @@ function Dashboard() {
 
   const loadDashboardData = async () => {
     try {
+      console.log('Loading dashboard data...');
+
       // Get overall stats
       const dbStats = await DatabaseService.getStats();
+      console.log('Dashboard stats:', dbStats);
 
       // Get today's appointments
       const today = format(startOfToday(), 'yyyy-MM-dd');
-      const appointments = await DatabaseService.getAppointmentsByDate(today, 1);
+      const appointments = await DatabaseService.db.appointments
+        .where('date')
+        .between(today, today + 'Z')
+        .sortBy('createdAt');
 
-      // Get recent prescriptions
-      const allPrescriptions = await DatabaseService.getAllPatients();
-      const prescriptionsWithDetails = await Promise.all(
-        allPrescriptions.slice(0, 5).map(async (patient) => {
-          const prescriptions = await DatabaseService.getPrescriptionsByPatient(patient.id, 1);
-          if (prescriptions.length > 0) {
-            return {
-              ...prescriptions[0],
-              patient
-            };
-          }
-          return null;
+      // Enrich with patient details
+      const enrichedAppointments = await Promise.all(
+        appointments.slice(0, 5).map(async (apt) => {
+          const patient = await DatabaseService.db.patients.get(apt.patientId);
+          return {
+            ...apt,
+            patientName: patient?.name || 'Unknown',
+            time: apt.time || format(new Date(apt.createdAt), 'HH:mm')
+          };
         })
       );
 
-      const recentPx = prescriptionsWithDetails.filter(p => p !== null);
+      // Get recent prescriptions with patient details
+      const recentPrescriptions = await DatabaseService.db.prescriptions
+        .orderBy('createdAt')
+        .reverse()
+        .limit(5)
+        .toArray();
+
+      const prescriptionsWithDetails = await Promise.all(
+        recentPrescriptions.map(async (prescription) => {
+          const patient = await DatabaseService.db.patients.get(prescription.patientId);
+          return {
+            ...prescription,
+            patient
+          };
+        })
+      );
+
+      console.log('Loaded:', {
+        stats: dbStats,
+        appointments: enrichedAppointments.length,
+        prescriptions: prescriptionsWithDetails.length
+      });
 
       setStats(dbStats);
-      setTodayAppointments(appointments);
-      setRecentPrescriptions(recentPx);
+      setTodayAppointments(enrichedAppointments);
+      setRecentPrescriptions(prescriptionsWithDetails);
       setLoading(false);
 
     } catch (error) {
