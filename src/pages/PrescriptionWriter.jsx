@@ -174,9 +174,9 @@ function PrescriptionWriter() {
       </div>
 
       {/* Prescription Paper */}
-      <div className="bg-white rounded-xl shadow-2xl p-8">
-        {/* Prescription Header */}
-        <div className="border-b-2 border-blue-600 pb-6 mb-6">
+      <div className="bg-white rounded-xl shadow-2xl p-8 prescription-container">
+        {/* Prescription Header - Hidden on print (letterhead has this info) */}
+        <div className="border-b-2 border-blue-600 pb-6 mb-6 prescription-header no-print">
           <div className="flex items-start justify-between">
             <div>
               <h1 className="text-4xl font-bold text-blue-800 mb-2">℞ Prescription</h1>
@@ -200,8 +200,16 @@ function PrescriptionWriter() {
           </div>
         </div>
 
+        {/* Print-only header - Simple version for print */}
+        <div className="print-only hidden">
+          <div className="text-right mb-4" style={{fontSize: '10pt', color: '#666'}}>
+            <p>Date: {format(new Date(), 'dd-MMM-yyyy')}</p>
+            <p>Rx No: VH-RX-{format(new Date(), 'yyyy')}-{String(Math.floor(Math.random() * 10000)).padStart(5, '0')}</p>
+          </div>
+        </div>
+
         {/* Patient Info */}
-        <div className="bg-blue-50 rounded-lg p-4 mb-6">
+        <div className="bg-blue-50 rounded-lg p-4 mb-6 patient-info">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
               <span className="text-gray-600">Patient:</span>{' '}
@@ -224,28 +232,34 @@ function PrescriptionWriter() {
 
         {/* Chief Complaints */}
         <div className="mb-6">
-          <label className="label">Chief Complaints</label>
+          <label className="label no-print">Chief Complaints</label>
           <textarea
             value={formData.complaints}
             onChange={(e) => setFormData({ ...formData, complaints: e.target.value })}
             rows="2"
             placeholder="e.g., Chest discomfort for 2 days, breathlessness on exertion..."
-            className="input"
+            className="input no-print"
           />
+          {/* Print version */}
+          {formData.complaints && (
+            <div className="print-only hidden" style={{marginBottom: '10px'}}>
+              <strong style={{color: '#555'}}>Chief Complaints:</strong> {formData.complaints}
+            </div>
+          )}
         </div>
 
         {/* Diagnosis */}
         <div className="mb-6">
-          <label className="label">Diagnosis *</label>
+          <label className="label no-print">Diagnosis *</label>
           <input
             type="text"
             value={formData.diagnosis}
             onChange={(e) => setFormData({ ...formData, diagnosis: e.target.value })}
             placeholder="e.g., Hypertension Stage 2, Type 2 Diabetes Mellitus"
-            className="input"
+            className="input no-print"
             required
           />
-          <div className="flex flex-wrap gap-2 mt-2">
+          <div className="flex flex-wrap gap-2 mt-2 no-print">
             {['Hypertension Stage 2', 'Type 2 Diabetes', 'Acute URTI', 'Angina Pectoris'].map(diag => (
               <button
                 key={diag}
@@ -259,10 +273,16 @@ function PrescriptionWriter() {
               </button>
             ))}
           </div>
+          {/* Print version */}
+          {formData.diagnosis && (
+            <div className="print-only hidden" style={{marginBottom: '10px'}}>
+              <strong style={{color: '#555'}}>Diagnosis:</strong> {formData.diagnosis}
+            </div>
+          )}
         </div>
 
         {/* Medications */}
-        <div className="mb-6 border-2 border-dashed border-blue-300 rounded-xl p-6 bg-blue-50">
+        <div className="mb-6 border-2 border-dashed border-blue-300 rounded-xl p-6 bg-blue-50 medications-list">
           <h3 className="font-bold text-xl mb-4 text-blue-800 flex items-center space-x-2">
             <span>💊</span>
             <span>Medications</span>
@@ -271,8 +291,9 @@ function PrescriptionWriter() {
           {formData.medications.length > 0 && (
             <div className="space-y-3 mb-4">
               {formData.medications.map((med, index) => (
-                <div key={med.id} className="bg-white p-4 rounded-lg">
-                  <div className="flex items-start justify-between mb-3">
+                <div key={med.id} className="bg-white p-4 rounded-lg medication-item">
+                  {/* Edit controls - hidden on print */}
+                  <div className="flex items-start justify-between mb-3 no-print">
                     <span className="font-bold text-gray-700">#{index + 1}</span>
                     <button
                       onClick={() => removeMedication(med.id)}
@@ -282,7 +303,13 @@ function PrescriptionWriter() {
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* Print-only medication header */}
+                  <div className="print-only hidden">
+                    <div className="font-bold text-gray-700 mb-2">{index + 1}.</div>
+                  </div>
+
+                  {/* Editable version - hidden on print */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 no-print">
                     <div className="md:col-span-2">
                       <label className="text-xs text-gray-600 mb-1 block">Medicine Name</label>
                       <input
@@ -349,14 +376,24 @@ function PrescriptionWriter() {
                       </select>
                     </div>
                   </div>
+
+                  {/* Print version - simple, readable format */}
+                  <div className="print-only hidden" style={{fontSize: '11pt', lineHeight: '1.6'}}>
+                    <div><strong>{med.drugName}</strong></div>
+                    <div className="ml-4 mt-1" style={{color: '#555'}}>
+                      {med.dosage} - {med.frequency} - {med.duration}
+                      <br/>
+                      <em>{med.instructions}</em>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
           )}
 
-          {/* Drug Search */}
+          {/* Drug Search - hidden on print */}
           {showDrugSearch && (
-            <div className="mb-4 relative">
+            <div className="mb-4 relative no-print">
               <div className="relative">
                 <Search className="absolute left-3 top-3 text-gray-400 w-5 h-5" />
                 <input
@@ -397,8 +434,8 @@ function PrescriptionWriter() {
             </div>
           )}
 
-          {/* Add Medication Buttons */}
-          <div className="flex items-center space-x-3">
+          {/* Add Medication Buttons - hidden on print */}
+          <div className="flex items-center space-x-3 no-print">
             {!showDrugSearch ? (
               <>
                 <button
@@ -423,31 +460,43 @@ function PrescriptionWriter() {
 
         {/* Investigations */}
         <div className="mb-6">
-          <label className="label">🔬 Investigations Advised</label>
+          <label className="label no-print">🔬 Investigations Advised</label>
           <textarea
             value={formData.investigations}
             onChange={(e) => setFormData({ ...formData, investigations: e.target.value })}
             rows="2"
             placeholder="e.g., Complete Blood Count, Lipid Profile, ECG, 2D Echo..."
-            className="input"
+            className="input no-print"
           />
+          {/* Print version */}
+          {formData.investigations && (
+            <div className="print-only hidden" style={{marginBottom: '10px'}}>
+              <strong style={{color: '#555'}}>Investigations:</strong> {formData.investigations}
+            </div>
+          )}
         </div>
 
         {/* Advice */}
         <div className="mb-6">
-          <label className="label">📝 Advice & Lifestyle Modifications</label>
+          <label className="label no-print">📝 Advice & Lifestyle Modifications</label>
           <textarea
             value={formData.advice}
             onChange={(e) => setFormData({ ...formData, advice: e.target.value })}
             rows="4"
             placeholder="e.g., Low salt diet, Regular exercise 30 min daily, Avoid smoking, Monitor BP daily..."
-            className="input"
+            className="input no-print"
           />
+          {/* Print version */}
+          {formData.advice && (
+            <div className="print-only hidden" style={{marginBottom: '10px'}}>
+              <strong style={{color: '#555'}}>Advice:</strong> {formData.advice}
+            </div>
+          )}
         </div>
 
         {/* Follow-up */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          <div>
+          <div className="no-print">
             <label className="label">Follow-up After</label>
             <select
               value={formData.followUp}
@@ -463,7 +512,7 @@ function PrescriptionWriter() {
               <option>SOS (If needed)</option>
             </select>
           </div>
-          <div>
+          <div className="no-print">
             <label className="label">Next Visit Date</label>
             <input
               type="date"
@@ -472,17 +521,24 @@ function PrescriptionWriter() {
               className="input"
             />
           </div>
+          {/* Print version */}
+          <div className="print-only hidden" style={{marginBottom: '10px'}}>
+            <strong style={{color: '#555'}}>Follow-up:</strong> {formData.followUp}
+            {formData.nextVisitDate && (
+              <span> (Next visit: {formData.nextVisitDate})</span>
+            )}
+          </div>
         </div>
 
         {/* Footer */}
-        <div className="border-t-2 pt-6 mt-8">
+        <div className="border-t-2 pt-6 mt-8 prescription-footer">
           <div className="flex items-end justify-between">
             <div className="text-sm text-gray-600">
               <p>This is a computer-generated prescription</p>
               <p className="mt-1">For queries, contact: +91 542 2367890</p>
             </div>
             <div className="text-right">
-              <div className="border-t-2 border-gray-800 pt-2 mt-8 w-48">
+              <div className="border-t-2 border-gray-800 pt-2 mt-8 w-48 doctor-signature">
                 <p className="font-semibold">Dr. Vivek Raj Singh</p>
                 <p className="text-sm text-gray-600">MD (Cardiology)</p>
                 <p className="text-xs text-gray-500">Reg. No: MCI-12345</p>

@@ -105,7 +105,7 @@ function Layout({ currentUser, onLogout }) {
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
-      <header className="bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-2xl sticky top-0 z-50">
+      <header className="bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-2xl sticky top-0 z-50 no-print">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
             {/* Left: Logo & Menu */}
@@ -207,7 +207,7 @@ function Layout({ currentUser, onLogout }) {
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
           lg:translate-x-0 fixed lg:sticky top-0 left-0 h-screen
           w-64 bg-white shadow-xl transition-transform duration-300 ease-in-out z-40
-          flex flex-col
+          flex flex-col no-print
         `}>
           <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
             {navItems.map((item) => {
@@ -275,7 +275,7 @@ function Layout({ currentUser, onLogout }) {
       {/* Overlay for mobile sidebar */}
       {sidebarOpen && (
         <div
-          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-30"
+          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-30 no-print"
           onClick={() => setSidebarOpen(false)}
         />
       )}

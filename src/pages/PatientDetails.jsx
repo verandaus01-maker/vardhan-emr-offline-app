@@ -249,7 +249,10 @@ function PatientDetails() {
               <Edit className="w-4 h-4" />
               <span>Edit</span>
             </button>
-            <button className="btn-secondary flex items-center space-x-2">
+            <button
+              onClick={() => window.print()}
+              className="btn-secondary flex items-center space-x-2"
+            >
               <Printer className="w-4 h-4" />
               <span>Print</span>
             </button>
