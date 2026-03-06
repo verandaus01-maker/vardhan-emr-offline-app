@@ -53,72 +53,86 @@ function PrescriptionWriter() {
     { name: 'Cytogard MR', genericName: 'Trimetazidine', dosages: ['35mg'] }
   ];
 
-  // English to Hindi translation mapping
+  // FIX: Enhanced English to Hindi translation mapping
   const translateToHindi = (text) => {
     if (!text) return '';
-    
+
     const translations = {
-      // Numbers stay as is
-      '0': '0', '1': '1', '2': '2', '3': '3', '4': '4', '5': '5', '6': '6', '7': '7', '8': '8', '9': '9',
-      
-      // Common phrases
-      'once': 'एक बार',
-      'twice': 'दो बार',
-      'thrice': 'तीन बार',
+      // Frequency
       'once a day': 'दिन में एक बार',
       'twice a day': 'दिन में दो बार',
       'thrice a day': 'दिन में तीन बार',
       'once daily': 'दिन में एक बार',
       'twice daily': 'दिन में दो बार',
       'three times a day': 'दिन में तीन बार',
+      '1 time a day': 'दिन में एक बार',
+      '2 times a day': 'दिन में दो बार',
+      '3 times a day': 'दिन में तीन बार',
+      '1 tablet - once a day': '1 tablet - दिन में एक बार',
+      '1 tablet - twice a day': '1 tablet - दिन में दो बार',
+      '1 tablet - thrice a day': '1 tablet - दिन में तीन बार',
       '1 time': 'एक बार',
       '2 times': 'दो बार',
       '3 times': 'तीन बार',
-      
-      // Tablet/dosage
-      'tablet': 'tablet',
-      'tablets': 'tablets',
-      '1 tablet': '1 tablet',
-      '2 tablets': '2 tablets',
-      'half tablet': '1/2 tablet',
-      '1/2 tablet': '1/2 tablet',
-      
-      // Time periods
-      'day': 'दिन',
+      'once': 'एक बार',
+      'twice': 'दो बार',
+      'thrice': 'तीन बार',
+
+      // Duration
+      '1 day': '1 दिन',
+      '2 days': '2 दिन',
+      '3 days': '3 दिन',
+      '5 days': '5 दिन',
+      '7 days': '7 दिन',
+      '10 days': '10 दिन',
+      '14 days': '14 दिन',
+      '15 days': '15 दिन',
+      '20 days': '20 दिन',
+      '30 days': '30 दिन',
+      '1 month': '1 महीने',
+      '2 months': '2 महीने',
+      '3 months': '3 महीने',
+      '6 months': '6 महीने',
+      '1 week': '1 सप्ताह',
+      '2 weeks': '2 सप्ताह',
       'days': 'दिन',
-      'week': 'सप्ताह',
+      'day': 'दिन',
       'weeks': 'सप्ताह',
-      'month': 'महीने',
+      'week': 'सप्ताह',
       'months': 'महीने',
-      
-      // Timing
-      'morning': 'सुबह',
-      'afternoon': 'दोपहर',
-      'evening': 'शाम',
-      'night': 'रात',
+      'month': 'महीने',
+
+      // ---- TIMING (5th column) ---- FIX: these were not translating
+      'before sleep': 'सोने से पहले',
+      'before bed': 'सोने से पहले',
+      'at bedtime': 'सोने से पहले',
+      'after sleep': 'सोने के बाद',
       'before food': 'खाने से पहले',
       'after food': 'खाने के बाद',
       'before meals': 'खाने से पहले',
       'after meals': 'खाने के बाद',
       'with food': 'खाने के साथ',
-      'before sleep': 'सोने से पहले',
-      'before bed': 'सोने से पहले',
+      'with meals': 'खाने के साथ',
       'empty stomach': 'खाली पेट',
-      'at bedtime': 'सोने से पहले',
+      'morning': 'सुबह',
+      'afternoon': 'दोपहर',
+      'evening': 'शाम',
+      'night': 'रात',
       'sublingual': 'जुबान के नीचे',
       'as needed': 'जरूरत पड़ने पर',
-      'when required': 'जरूरत पड़ने पर'
+      'when required': 'जरूरत पड़ने पर',
+      'sos': 'जरूरत पड़ने पर',
     };
 
-    let translated = text.toLowerCase();
-    
-    // Replace phrases (longer ones first)
+    let translated = text.trim();
+
+    // Replace full phrases first (longest first to avoid partial replacements)
     const sortedKeys = Object.keys(translations).sort((a, b) => b.length - a.length);
     sortedKeys.forEach(key => {
-      const regex = new RegExp(key, 'gi');
+      const regex = new RegExp(`\\b${key}\\b`, 'gi');
       translated = translated.replace(regex, translations[key]);
     });
-    
+
     return translated;
   };
 
@@ -145,7 +159,7 @@ function PrescriptionWriter() {
 
   const searchDrugsLocal = () => {
     const searchLower = drugSearch.toLowerCase();
-    const results = drugDatabase.filter(drug => 
+    const results = drugDatabase.filter(drug =>
       drug.name.toLowerCase().includes(searchLower) ||
       drug.genericName.toLowerCase().includes(searchLower)
     ).slice(0, 10);
@@ -192,7 +206,7 @@ function PrescriptionWriter() {
       ...formData,
       investigations: {
         ...formData.investigations,
-        [category]: typeof formData.investigations[category] === 'string' 
+        [category]: typeof formData.investigations[category] === 'string'
           ? value
           : {
               ...formData.investigations[category],
@@ -283,15 +297,15 @@ function PrescriptionWriter() {
       </div>
 
       {/* Prescription Content */}
-      <div style={{ 
+      <div style={{
         backgroundColor: '#ffffff',
         padding: '20px 30px',
         minHeight: '297mm',
         boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
       }}>
-        
+
         {/* Patient Info */}
-        <div style={{ 
+        <div style={{
           borderBottom: '1px solid #000',
           paddingBottom: '6px',
           marginBottom: '10px',
@@ -365,12 +379,14 @@ function PrescriptionWriter() {
           </div>
         )}
 
-        {/* Investigation Results */}
+        {/* Investigation Results - SCREEN */}
         <div className="no-print" style={{ marginBottom: '8px' }}>
           <strong style={{ fontSize: '11pt', display: 'block', marginBottom: '5px' }}>Investigation Results:</strong>
 
+          {/* KFT */}
           <div style={{ marginBottom: '6px' }}>
-            <div style={{ fontSize: '10pt', fontWeight: '600', marginBottom: '2px' }}>Kidney Function Test KFT</div>
+            {/* FIX: Bold test name */}
+            <div style={{ fontSize: '10pt', fontWeight: '700', marginBottom: '2px' }}>Kidney Function Test KFT</div>
             <div style={{ display: 'flex', gap: '6px' }}>
               <input type="date" value={formData.investigations.kft.date} onChange={(e) => updateInvestigation('kft', 'date', e.target.value)} style={{ width: '110px', fontSize: '9.5pt', padding: '3px 4px', border: '1px solid #999' }} />
               <input type="text" value={formData.investigations.kft.uricAcid} onChange={(e) => updateInvestigation('kft', 'uricAcid', e.target.value)} placeholder="S. Uric acid" style={{ width: '90px', fontSize: '9.5pt', padding: '3px 4px', border: '1px solid #999' }} />
@@ -379,24 +395,27 @@ function PrescriptionWriter() {
             </div>
           </div>
 
+          {/* CBC */}
           <div style={{ marginBottom: '6px' }}>
-            <div style={{ fontSize: '10pt', fontWeight: '600', marginBottom: '2px' }}>CBC - Complete Blood Count</div>
+            <div style={{ fontSize: '10pt', fontWeight: '700', marginBottom: '2px' }}>CBC - Complete Blood Count</div>
             <div style={{ display: 'flex', gap: '6px' }}>
               <input type="date" value={formData.investigations.cbc.date} onChange={(e) => updateInvestigation('cbc', 'date', e.target.value)} style={{ width: '110px', fontSize: '9.5pt', padding: '3px 4px', border: '1px solid #999' }} />
               <input type="text" value={formData.investigations.cbc.hemoglobin} onChange={(e) => updateInvestigation('cbc', 'hemoglobin', e.target.value)} placeholder="Hemoglobin" style={{ width: '120px', fontSize: '9.5pt', padding: '3px 4px', border: '1px solid #999' }} />
             </div>
           </div>
 
+          {/* RBS */}
           <div style={{ marginBottom: '6px' }}>
-            <div style={{ fontSize: '10pt', fontWeight: '600', marginBottom: '2px' }}>RBS (Random Blood Sugar)</div>
+            <div style={{ fontSize: '10pt', fontWeight: '700', marginBottom: '2px' }}>RBS (Random Blood Sugar)</div>
             <div style={{ display: 'flex', gap: '6px' }}>
               <input type="date" value={formData.investigations.rbs.date} onChange={(e) => updateInvestigation('rbs', 'date', e.target.value)} style={{ width: '110px', fontSize: '9.5pt', padding: '3px 4px', border: '1px solid #999' }} />
               <input type="text" value={formData.investigations.rbs.value} onChange={(e) => updateInvestigation('rbs', 'value', e.target.value)} placeholder="Random Blood Sugar" style={{ width: '120px', fontSize: '9.5pt', padding: '3px 4px', border: '1px solid #999' }} />
             </div>
           </div>
 
+          {/* LFT */}
           <div style={{ marginBottom: '6px' }}>
-            <div style={{ fontSize: '10pt', fontWeight: '600', marginBottom: '2px' }}>Liver Function Test LFT</div>
+            <div style={{ fontSize: '10pt', fontWeight: '700', marginBottom: '2px' }}>Liver Function Test LFT</div>
             <div style={{ display: 'flex', gap: '6px' }}>
               <input type="date" value={formData.investigations.lft.date} onChange={(e) => updateInvestigation('lft', 'date', e.target.value)} style={{ width: '110px', fontSize: '9.5pt', padding: '3px 4px', border: '1px solid #999' }} />
               <input type="text" value={formData.investigations.lft.sgpt} onChange={(e) => updateInvestigation('lft', 'sgpt', e.target.value)} placeholder="SGPT (ALT)" style={{ width: '100px', fontSize: '9.5pt', padding: '3px 4px', border: '1px solid #999' }} />
@@ -404,26 +423,29 @@ function PrescriptionWriter() {
             </div>
           </div>
 
+          {/* ECG */}
           <div style={{ marginBottom: '6px' }}>
-            <div style={{ fontSize: '10pt', fontWeight: '600', marginBottom: '2px' }}>ECG</div>
+            <div style={{ fontSize: '10pt', fontWeight: '700', marginBottom: '2px' }}>ECG</div>
             <input type="text" value={formData.investigations.ecg} onChange={(e) => updateInvestigation('ecg', null, e.target.value)} placeholder="SR, QS V1-V5" style={{ width: '100%', fontSize: '9.5pt', padding: '3px 4px', border: '1px solid #999' }} />
           </div>
 
+          {/* Echo */}
           <div style={{ marginBottom: '6px' }}>
-            <div style={{ fontSize: '10pt', fontWeight: '600', marginBottom: '2px' }}>Echocardiography-Colour Doppler</div>
+            <div style={{ fontSize: '10pt', fontWeight: '700', marginBottom: '2px' }}>Echocardiography-Colour Doppler</div>
             <input type="text" value={formData.investigations.echo} onChange={(e) => updateInvestigation('echo', null, e.target.value)} placeholder="LAD Hx, Normal Valves, LVEF 50%" style={{ width: '100%', fontSize: '9.5pt', padding: '3px 4px', border: '1px solid #999' }} />
           </div>
         </div>
 
-        {/* Print Investigations */}
+        {/* Print Investigations - FIX: Bold test names above tables */}
         <div className="print-only" style={{ marginBottom: '8px' }}>
           {(hasInvestigationData('kft') || hasInvestigationData('cbc') || hasInvestigationData('rbs') || hasInvestigationData('lft') || hasInvestigationData('ecg') || hasInvestigationData('echo')) && (
             <>
               <strong style={{ fontSize: '11pt', display: 'block', marginBottom: '4px' }}>Investigation Results:</strong>
-              
+
               {hasInvestigationData('kft') && (
                 <div style={{ marginBottom: '6px' }}>
-                  <div style={{ fontSize: '10pt', fontWeight: '600', marginBottom: '2px' }}>Kidney Function Test KFT</div>
+                  {/* FIX: Bold test label above table */}
+                  <div style={{ fontSize: '10pt', fontWeight: '700', marginBottom: '2px' }}>Kidney Function Test KFT</div>
                   <table style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000' }}>
                     <thead>
                       <tr>
@@ -447,7 +469,7 @@ function PrescriptionWriter() {
 
               {hasInvestigationData('cbc') && (
                 <div style={{ marginBottom: '6px' }}>
-                  <div style={{ fontSize: '10pt', fontWeight: '600', marginBottom: '2px' }}>CBC - Complete Blood Count</div>
+                  <div style={{ fontSize: '10pt', fontWeight: '700', marginBottom: '2px' }}>CBC - Complete Blood Count</div>
                   <table style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000' }}>
                     <thead>
                       <tr>
@@ -467,7 +489,7 @@ function PrescriptionWriter() {
 
               {hasInvestigationData('rbs') && (
                 <div style={{ marginBottom: '6px' }}>
-                  <div style={{ fontSize: '10pt', fontWeight: '600', marginBottom: '2px' }}>RBS (Random Blood Sugar)</div>
+                  <div style={{ fontSize: '10pt', fontWeight: '700', marginBottom: '2px' }}>RBS (Random Blood Sugar)</div>
                   <table style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000' }}>
                     <thead>
                       <tr>
@@ -487,7 +509,7 @@ function PrescriptionWriter() {
 
               {hasInvestigationData('lft') && (
                 <div style={{ marginBottom: '6px' }}>
-                  <div style={{ fontSize: '10pt', fontWeight: '600', marginBottom: '2px' }}>Liver Function Test LFT</div>
+                  <div style={{ fontSize: '10pt', fontWeight: '700', marginBottom: '2px' }}>Liver Function Test LFT</div>
                   <table style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000' }}>
                     <thead>
                       <tr>
@@ -507,8 +529,17 @@ function PrescriptionWriter() {
                 </div>
               )}
 
-              {formData.investigations.ecg && <div style={{ fontSize: '10pt', marginBottom: '4px' }}><strong>ECG:</strong> {formData.investigations.ecg}</div>}
-              {formData.investigations.echo && <div style={{ fontSize: '10pt', marginBottom: '4px' }}><strong>Echocardiography-Colour Doppler:</strong> {formData.investigations.echo}</div>}
+              {/* FIX: Bold ECG and Echo labels */}
+              {formData.investigations.ecg && (
+                <div style={{ fontSize: '10pt', marginBottom: '4px' }}>
+                  <strong>ECG:</strong> {formData.investigations.ecg}
+                </div>
+              )}
+              {formData.investigations.echo && (
+                <div style={{ fontSize: '10pt', marginBottom: '4px' }}>
+                  <strong>Echocardiography-Colour Doppler:</strong> {formData.investigations.echo}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -524,57 +555,118 @@ function PrescriptionWriter() {
           </div>
         )}
 
-        {/* Medications Table - AUTO HINDI TRANSLATION */}
+        {/* ===== MEDICATIONS TABLE ===== */}
         <div style={{ marginTop: '8px', marginBottom: '8px' }}>
           {formData.medications.length > 0 && (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10.5pt', border: '1px solid #000' }}>
               <thead>
-                <tr>
-                  <th style={{ padding: '4px 6px', border: '1px solid #000', textAlign: 'center', width: '30px' }}>Rx</th>
-                  <th style={{ padding: '4px 6px', border: '1px solid #000', textAlign: 'left' }}>नाम</th>
-                  <th style={{ padding: '4px 6px', border: '1px solid #000', textAlign: 'center', width: '140px' }}>आवृत्ति</th>
-                  <th style={{ padding: '4px 6px', border: '1px solid #000', textAlign: 'center', width: '70px' }}>अवधि</th>
-                  <th style={{ padding: '4px 6px', border: '1px solid #000', textAlign: 'center', width: '100px' }}>टिप्पणियाँ</th>
+                <tr style={{ backgroundColor: '#f9f9f9' }}>
+                  {/* FIX: Rx column header - numbers only, no sub-text */}
+                  <th style={{ padding: '5px 6px', border: '1px solid #000', textAlign: 'center', width: '35px' }}>Rx</th>
+                  {/* FIX: Name column - tablet details */}
+                  <th style={{ padding: '5px 6px', border: '1px solid #000', textAlign: 'left' }}>नाम</th>
+                  {/* FIX: Frequency column - 1 tablet, how many times */}
+                  <th style={{ padding: '5px 6px', border: '1px solid #000', textAlign: 'center', width: '150px' }}>आवृत्ति</th>
+                  {/* FIX: Duration column - number of days */}
+                  <th style={{ padding: '5px 6px', border: '1px solid #000', textAlign: 'center', width: '75px' }}>अवधि</th>
+                  {/* FIX: Timing/Notes column - before/after sleep in Hindi */}
+                  <th style={{ padding: '5px 6px', border: '1px solid #000', textAlign: 'center', width: '110px' }}>टिप्पणियाँ</th>
                   <th className="no-print" style={{ padding: '4px', border: '1px solid #000', width: '30px' }}></th>
                 </tr>
               </thead>
               <tbody>
                 {formData.medications.map((med, index) => (
                   <React.Fragment key={med.id}>
-                    {/* Edit Mode */}
+
+                    {/* ---- SCREEN / EDIT ROW ---- */}
                     <tr className="no-print">
-                      <td style={{ padding: '6px', border: '1px solid #000', textAlign: 'center', verticalAlign: 'top' }}>{index + 1}</td>
-                      <td style={{ padding: '4px 6px', border: '1px solid #000' }}>
-                        <input type="text" value={med.drugName} onChange={(e) => updateMedication(med.id, 'drugName', e.target.value)} placeholder="Tablet Utiliv (300mg)" style={{ width: '100%', border: 'none', fontSize: '10pt', padding: '2px', marginBottom: '2px' }} />
-                        <input type="text" value={med.genericName} onChange={(e) => updateMedication(med.id, 'genericName', e.target.value)} placeholder="Ursodeoxycholic Acid" style={{ width: '100%', border: 'none', fontSize: '9pt', color: '#555', padding: '2px', fontStyle: 'italic' }} />
+                      {/* FIX: Rx = number only */}
+                      <td style={{ padding: '6px', border: '1px solid #000', textAlign: 'center', verticalAlign: 'middle', fontWeight: '600' }}>
+                        {index + 1}
                       </td>
+                      {/* FIX: Drug name + generic (italic small) */}
                       <td style={{ padding: '4px 6px', border: '1px solid #000' }}>
-                        <input type="text" value={med.frequency} onChange={(e) => updateMedication(med.id, 'frequency', e.target.value)} placeholder="1 tablet - once a day" style={{ width: '100%', border: 'none', fontSize: '10pt', padding: '2px' }} />
+                        <input
+                          type="text"
+                          value={med.drugName}
+                          onChange={(e) => updateMedication(med.id, 'drugName', e.target.value)}
+                          placeholder="Tablet Ecosprin AV (75/40)"
+                          style={{ width: '100%', border: 'none', fontSize: '10pt', padding: '2px', marginBottom: '2px', fontWeight: '600' }}
+                        />
+                        <input
+                          type="text"
+                          value={med.genericName}
+                          onChange={(e) => updateMedication(med.id, 'genericName', e.target.value)}
+                          placeholder="Aspirin 75mg + Atorvastatin 40mg"
+                          style={{ width: '100%', border: 'none', fontSize: '8.5pt', color: '#555', padding: '2px', fontStyle: 'italic', textTransform: 'uppercase' }}
+                        />
                       </td>
+                      {/* Frequency: 1 tablet - once/twice a day */}
                       <td style={{ padding: '4px 6px', border: '1px solid #000' }}>
-                        <input type="text" value={med.duration} onChange={(e) => updateMedication(med.id, 'duration', e.target.value)} placeholder="15 days" style={{ width: '100%', border: 'none', fontSize: '10pt', padding: '2px', textAlign: 'center' }} />
+                        <input
+                          type="text"
+                          value={med.frequency}
+                          onChange={(e) => updateMedication(med.id, 'frequency', e.target.value)}
+                          placeholder="1 tablet - once a day"
+                          style={{ width: '100%', border: 'none', fontSize: '10pt', padding: '2px', textAlign: 'center' }}
+                        />
                       </td>
+                      {/* Duration: 15 days */}
                       <td style={{ padding: '4px 6px', border: '1px solid #000' }}>
-                        <input type="text" value={med.timing} onChange={(e) => updateMedication(med.id, 'timing', e.target.value)} placeholder="before sleep" style={{ width: '100%', border: 'none', fontSize: '10pt', padding: '2px', textAlign: 'center' }} />
+                        <input
+                          type="text"
+                          value={med.duration}
+                          onChange={(e) => updateMedication(med.id, 'duration', e.target.value)}
+                          placeholder="15 days"
+                          style={{ width: '100%', border: 'none', fontSize: '10pt', padding: '2px', textAlign: 'center' }}
+                        />
                       </td>
-                      <td style={{ padding: '4px', border: '1px solid #000', textAlign: 'center' }}>
+                      {/* Timing: before sleep / after food etc */}
+                      <td style={{ padding: '4px 6px', border: '1px solid #000' }}>
+                        <input
+                          type="text"
+                          value={med.timing}
+                          onChange={(e) => updateMedication(med.id, 'timing', e.target.value)}
+                          placeholder="before sleep"
+                          style={{ width: '100%', border: 'none', fontSize: '10pt', padding: '2px', textAlign: 'center' }}
+                        />
+                      </td>
+                      <td style={{ padding: '4px', border: '1px solid #000', textAlign: 'center', verticalAlign: 'middle' }}>
                         <button onClick={() => removeMedication(med.id)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#dc2626' }}>
                           <X style={{ width: '16px', height: '16px' }} />
                         </button>
                       </td>
                     </tr>
 
-                    {/* Print Mode - AUTO HINDI */}
+                    {/* ---- PRINT ROW - Hindi auto-translation ---- */}
                     <tr className="print-only">
-                      <td style={{ padding: '4px 6px', border: '1px solid #000', textAlign: 'center', verticalAlign: 'top' }}>{index + 1}</td>
-                      <td style={{ padding: '4px 6px', border: '1px solid #000', verticalAlign: 'top' }}>
-                        <div style={{ fontWeight: '600', fontSize: '10.5pt' }}>{med.drugName}</div>
-                        {med.genericName && <div style={{ fontSize: '9pt', color: '#555', fontStyle: 'italic', marginTop: '1px' }}>{med.genericName}</div>}
+                      {/* FIX: Rx = number only, centered, no extra text */}
+                      <td style={{ padding: '5px 6px', border: '1px solid #000', textAlign: 'center', verticalAlign: 'middle', fontWeight: '600' }}>
+                        {index + 1}
                       </td>
-                      <td style={{ padding: '4px 6px', border: '1px solid #000', verticalAlign: 'top', textAlign: 'center' }}>{translateToHindi(med.frequency)}</td>
-                      <td style={{ padding: '4px 6px', border: '1px solid #000', verticalAlign: 'top', textAlign: 'center' }}>{translateToHindi(med.duration)}</td>
-                      <td style={{ padding: '4px 6px', border: '1px solid #000', verticalAlign: 'top', textAlign: 'center' }}>{translateToHindi(med.timing)}</td>
+                      {/* Drug name bold + generic italic uppercase small */}
+                      <td style={{ padding: '5px 6px', border: '1px solid #000', verticalAlign: 'top' }}>
+                        <div style={{ fontWeight: '700', fontSize: '10.5pt' }}>{med.drugName}</div>
+                        {med.genericName && (
+                          <div style={{ fontSize: '8pt', color: '#444', fontStyle: 'italic', textTransform: 'uppercase', marginTop: '1px', letterSpacing: '0.3px' }}>
+                            {med.genericName}
+                          </div>
+                        )}
+                      </td>
+                      {/* FIX: Frequency - translated to Hindi */}
+                      <td style={{ padding: '5px 6px', border: '1px solid #000', verticalAlign: 'middle', textAlign: 'center' }}>
+                        {translateToHindi(med.frequency)}
+                      </td>
+                      {/* FIX: Duration - translated to Hindi */}
+                      <td style={{ padding: '5px 6px', border: '1px solid #000', verticalAlign: 'middle', textAlign: 'center' }}>
+                        {translateToHindi(med.duration)}
+                      </td>
+                      {/* FIX: Timing - NOW properly translated to Hindi */}
+                      <td style={{ padding: '5px 6px', border: '1px solid #000', verticalAlign: 'middle', textAlign: 'center' }}>
+                        {translateToHindi(med.timing)}
+                      </td>
                     </tr>
+
                   </React.Fragment>
                 ))}
               </tbody>
