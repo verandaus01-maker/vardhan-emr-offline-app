@@ -303,6 +303,24 @@ function PrescriptionWriter() {
         minHeight: '297mm',
         boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
       }}>
+        {/* Spacer for pre-printed hospital letterhead header - screen only */}
+        <div className="no-print" style={{ marginBottom: '8px' }}>
+          <div style={{ fontSize: '9pt', color: '#aaa', textAlign: 'center', border: '1px dashed #ddd', padding: '4px', borderRadius: '3px' }}>
+            ↑ Pre-printed hospital header space (approx 55mm on actual letterhead)
+          </div>
+        </div>
+
+        {/* @page rule for print margins matching Vardhan letterhead */}
+        <style>{`
+          @media print {
+            @page {
+              margin-top: 58mm;
+              margin-bottom: 28mm;
+              margin-left: 10mm;
+              margin-right: 10mm;
+            }
+          }
+        `}</style>
 
         {/* Patient Info */}
         <div style={{
@@ -557,133 +575,133 @@ function PrescriptionWriter() {
         {/* ===== MEDICATIONS TABLE ===== */}
         <div style={{ marginTop: '8px', marginBottom: '8px' }}>
 
-          {/* ── SCREEN-ONLY TABLE (edit mode, 6 columns with delete button) ── */}
+          {/* ── SINGLE TABLE - inputs visible on screen, Hindi text always present ── */}
+          {/* Print CSS hides inputs and shows translated divs via display:none / display:block */}
           {formData.medications.length > 0 && (
-            <table className="no-print" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10.5pt', border: '1px solid #000', tableLayout: 'fixed' }}>
-              <colgroup>
-                <col style={{ width: '40px' }} />
-                <col />
-                <col style={{ width: '160px' }} />
-                <col style={{ width: '80px' }} />
-                <col style={{ width: '120px' }} />
-                <col style={{ width: '34px' }} />
-              </colgroup>
-              <thead>
-                <tr style={{ backgroundColor: '#f9f9f9' }}>
-                  <th style={{ padding: '5px 6px', border: '1px solid #000', textAlign: 'center' }}>Rx</th>
-                  <th style={{ padding: '5px 6px', border: '1px solid #000', textAlign: 'left' }}>नाम</th>
-                  <th style={{ padding: '5px 6px', border: '1px solid #000', textAlign: 'center' }}>आवृत्ति</th>
-                  <th style={{ padding: '5px 6px', border: '1px solid #000', textAlign: 'center' }}>अवधि</th>
-                  <th style={{ padding: '5px 6px', border: '1px solid #000', textAlign: 'center' }}>टिप्पणियाँ</th>
-                  <th style={{ padding: '4px', border: '1px solid #000' }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {formData.medications.map((med, index) => (
-                  <tr key={med.id}>
-                    <td style={{ padding: '6px', border: '1px solid #000', textAlign: 'center', verticalAlign: 'middle', fontWeight: '600' }}>
-                      {index + 1}
-                    </td>
-                    <td style={{ padding: '4px 6px', border: '1px solid #000' }}>
-                      <input
-                        type="text"
-                        value={med.drugName}
-                        onChange={(e) => updateMedication(med.id, 'drugName', e.target.value)}
-                        placeholder="Tablet Ecosprin AV (75/40)"
-                        style={{ width: '100%', border: 'none', fontSize: '10pt', padding: '2px', marginBottom: '2px', fontWeight: '600' }}
-                      />
-                      <input
-                        type="text"
-                        value={med.genericName}
-                        onChange={(e) => updateMedication(med.id, 'genericName', e.target.value)}
-                        placeholder="Aspirin 75mg + Atorvastatin 40mg"
-                        style={{ width: '100%', border: 'none', fontSize: '8.5pt', color: '#555', padding: '2px', fontStyle: 'italic', textTransform: 'uppercase' }}
-                      />
-                    </td>
-                    <td style={{ padding: '4px 6px', border: '1px solid #000' }}>
-                      <input
-                        type="text"
-                        value={med.frequency}
-                        onChange={(e) => updateMedication(med.id, 'frequency', e.target.value)}
-                        placeholder="1 tablet - once a day"
-                        style={{ width: '100%', border: 'none', fontSize: '10pt', padding: '2px', textAlign: 'center' }}
-                      />
-                    </td>
-                    <td style={{ padding: '4px 6px', border: '1px solid #000' }}>
-                      <input
-                        type="text"
-                        value={med.duration}
-                        onChange={(e) => updateMedication(med.id, 'duration', e.target.value)}
-                        placeholder="15 days"
-                        style={{ width: '100%', border: 'none', fontSize: '10pt', padding: '2px', textAlign: 'center' }}
-                      />
-                    </td>
-                    <td style={{ padding: '4px 6px', border: '1px solid #000' }}>
-                      <input
-                        type="text"
-                        value={med.timing}
-                        onChange={(e) => updateMedication(med.id, 'timing', e.target.value)}
-                        placeholder="before sleep"
-                        style={{ width: '100%', border: 'none', fontSize: '10pt', padding: '2px', textAlign: 'center' }}
-                      />
-                    </td>
-                    <td style={{ padding: '4px', border: '1px solid #000', textAlign: 'center', verticalAlign: 'middle' }}>
-                      <button onClick={() => removeMedication(med.id)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#dc2626' }}>
-                        <X style={{ width: '16px', height: '16px' }} />
-                      </button>
-                    </td>
+            <>
+              <style>{`
+                @media screen {
+                  .med-print-cell { display: none !important; }
+                  .med-input-cell { display: block !important; }
+                  .med-delete-col { display: table-cell !important; }
+                  .med-delete-th { display: table-cell !important; }
+                }
+                @media print {
+                  .med-print-cell { display: block !important; }
+                  .med-input-cell { display: none !important; }
+                  .med-delete-col { display: none !important; }
+                  .med-delete-th { display: none !important; }
+                  col.med-delete-col-group { display: none !important; width: 0 !important; }
+                }
+              `}</style>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10.5pt', border: '1px solid #000', tableLayout: 'fixed' }}>
+                <colgroup>
+                  <col style={{ width: '40px' }} />
+                  <col />
+                  <col style={{ width: '160px' }} />
+                  <col style={{ width: '80px' }} />
+                  <col style={{ width: '120px' }} />
+                  <col className="med-delete-col-group med-delete-th" style={{ width: '34px' }} />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th style={{ padding: '5px 6px', border: '1px solid #000', textAlign: 'center', backgroundColor: 'transparent', fontWeight: '600' }}>Rx</th>
+                    <th style={{ padding: '5px 6px', border: '1px solid #000', textAlign: 'left', backgroundColor: 'transparent', fontWeight: '600' }}>नाम</th>
+                    <th style={{ padding: '5px 6px', border: '1px solid #000', textAlign: 'center', backgroundColor: 'transparent', fontWeight: '600' }}>आवृत्ति</th>
+                    <th style={{ padding: '5px 6px', border: '1px solid #000', textAlign: 'center', backgroundColor: 'transparent', fontWeight: '600' }}>अवधि</th>
+                    <th style={{ padding: '5px 6px', border: '1px solid #000', textAlign: 'center', backgroundColor: 'transparent', fontWeight: '600' }}>टिप्पणियाँ</th>
+                    <th className="med-delete-th" style={{ padding: '4px', border: '1px solid #000', backgroundColor: 'transparent' }}></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+                </thead>
+                <tbody>
+                  {formData.medications.map((med, index) => (
+                    <tr key={med.id}>
+                      {/* Rx - number only */}
+                      <td style={{ padding: '6px', border: '1px solid #000', textAlign: 'center', verticalAlign: 'middle', fontWeight: '600' }}>
+                        {index + 1}
+                      </td>
 
-          {/* ── PRINT-ONLY TABLE (clean 5-column, Hindi translated) ── */}
-          {formData.medications.length > 0 && (
-            <table className="print-only" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10.5pt', border: '1px solid #000', tableLayout: 'fixed' }}>
-              <colgroup>
-                <col style={{ width: '40px' }} />
-                <col />
-                <col style={{ width: '160px' }} />
-                <col style={{ width: '80px' }} />
-                <col style={{ width: '120px' }} />
-              </colgroup>
-              <thead>
-                <tr style={{ backgroundColor: '#f9f9f9' }}>
-                  <th style={{ padding: '5px 6px', border: '1px solid #000', textAlign: 'center' }}>Rx</th>
-                  <th style={{ padding: '5px 6px', border: '1px solid #000', textAlign: 'left' }}>नाम</th>
-                  <th style={{ padding: '5px 6px', border: '1px solid #000', textAlign: 'center' }}>आवृत्ति</th>
-                  <th style={{ padding: '5px 6px', border: '1px solid #000', textAlign: 'center' }}>अवधि</th>
-                  <th style={{ padding: '5px 6px', border: '1px solid #000', textAlign: 'center' }}>टिप्पणियाँ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {formData.medications.map((med, index) => (
-                  <tr key={med.id}>
-                    <td style={{ padding: '5px 6px', border: '1px solid #000', textAlign: 'center', verticalAlign: 'middle', fontWeight: '600' }}>
-                      {index + 1}
-                    </td>
-                    <td style={{ padding: '5px 6px', border: '1px solid #000', verticalAlign: 'top' }}>
-                      <div style={{ fontWeight: '700', fontSize: '10.5pt' }}>{med.drugName}</div>
-                      {med.genericName && (
-                        <div style={{ fontSize: '8pt', color: '#444', fontStyle: 'italic', textTransform: 'uppercase', marginTop: '1px', letterSpacing: '0.3px' }}>
-                          {med.genericName}
+                      {/* Name cell - input on screen, styled div on print */}
+                      <td style={{ padding: '4px 6px', border: '1px solid #000', verticalAlign: 'top' }}>
+                        <div className="med-input-cell">
+                          <input
+                            type="text"
+                            value={med.drugName}
+                            onChange={(e) => updateMedication(med.id, 'drugName', e.target.value)}
+                            placeholder="Tablet Ecosprin AV (75/40)"
+                            style={{ width: '100%', border: 'none', fontSize: '10pt', padding: '2px', marginBottom: '2px', fontWeight: '600' }}
+                          />
+                          <input
+                            type="text"
+                            value={med.genericName}
+                            onChange={(e) => updateMedication(med.id, 'genericName', e.target.value)}
+                            placeholder="Aspirin 75mg + Atorvastatin 40mg"
+                            style={{ width: '100%', border: 'none', fontSize: '8.5pt', color: '#555', padding: '2px', fontStyle: 'italic', textTransform: 'uppercase' }}
+                          />
                         </div>
-                      )}
-                    </td>
-                    <td style={{ padding: '5px 6px', border: '1px solid #000', verticalAlign: 'middle', textAlign: 'center' }}>
-                      {translateToHindi(med.frequency)}
-                    </td>
-                    <td style={{ padding: '5px 6px', border: '1px solid #000', verticalAlign: 'middle', textAlign: 'center' }}>
-                      {translateToHindi(med.duration)}
-                    </td>
-                    <td style={{ padding: '5px 6px', border: '1px solid #000', verticalAlign: 'middle', textAlign: 'center' }}>
-                      {translateToHindi(med.timing)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                        <div className="med-print-cell">
+                          <div style={{ fontWeight: '700', fontSize: '10.5pt' }}>{med.drugName}</div>
+                          {med.genericName && (
+                            <div style={{ fontSize: '8pt', color: '#444', fontStyle: 'italic', textTransform: 'uppercase', marginTop: '1px' }}>
+                              {med.genericName}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Frequency */}
+                      <td style={{ padding: '4px 6px', border: '1px solid #000', verticalAlign: 'middle', textAlign: 'center' }}>
+                        <div className="med-input-cell">
+                          <input
+                            type="text"
+                            value={med.frequency}
+                            onChange={(e) => updateMedication(med.id, 'frequency', e.target.value)}
+                            placeholder="1 tablet - once a day"
+                            style={{ width: '100%', border: 'none', fontSize: '10pt', padding: '2px', textAlign: 'center' }}
+                          />
+                        </div>
+                        <div className="med-print-cell" style={{ textAlign: 'center' }}>{translateToHindi(med.frequency)}</div>
+                      </td>
+
+                      {/* Duration */}
+                      <td style={{ padding: '4px 6px', border: '1px solid #000', verticalAlign: 'middle', textAlign: 'center' }}>
+                        <div className="med-input-cell">
+                          <input
+                            type="text"
+                            value={med.duration}
+                            onChange={(e) => updateMedication(med.id, 'duration', e.target.value)}
+                            placeholder="15 days"
+                            style={{ width: '100%', border: 'none', fontSize: '10pt', padding: '2px', textAlign: 'center' }}
+                          />
+                        </div>
+                        <div className="med-print-cell" style={{ textAlign: 'center' }}>{translateToHindi(med.duration)}</div>
+                      </td>
+
+                      {/* Timing */}
+                      <td style={{ padding: '4px 6px', border: '1px solid #000', verticalAlign: 'middle', textAlign: 'center' }}>
+                        <div className="med-input-cell">
+                          <input
+                            type="text"
+                            value={med.timing}
+                            onChange={(e) => updateMedication(med.id, 'timing', e.target.value)}
+                            placeholder="before sleep"
+                            style={{ width: '100%', border: 'none', fontSize: '10pt', padding: '2px', textAlign: 'center' }}
+                          />
+                        </div>
+                        <div className="med-print-cell" style={{ textAlign: 'center' }}>{translateToHindi(med.timing)}</div>
+                      </td>
+
+                      {/* Delete button - screen only */}
+                      <td className="med-delete-col" style={{ padding: '4px', border: '1px solid #000', textAlign: 'center', verticalAlign: 'middle' }}>
+                        <button onClick={() => removeMedication(med.id)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#dc2626' }}>
+                          <X style={{ width: '16px', height: '16px' }} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
           )}
 
           {/* Add Medication */}
