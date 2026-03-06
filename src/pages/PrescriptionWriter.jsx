@@ -444,8 +444,7 @@ function PrescriptionWriter() {
 
               {hasInvestigationData('kft') && (
                 <div style={{ marginBottom: '6px' }}>
-                  {/* FIX: Bold test label above table */}
-                  <div style={{ fontSize: '10pt', fontWeight: '700', marginBottom: '2px' }}>Kidney Function Test KFT</div>
+                  <strong style={{ fontSize: '10pt', display: 'block', marginBottom: '2px' }}>Kidney Function Test KFT</strong>
                   <table style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000' }}>
                     <thead>
                       <tr>
@@ -469,7 +468,7 @@ function PrescriptionWriter() {
 
               {hasInvestigationData('cbc') && (
                 <div style={{ marginBottom: '6px' }}>
-                  <div style={{ fontSize: '10pt', fontWeight: '700', marginBottom: '2px' }}>CBC - Complete Blood Count</div>
+                  <strong style={{ fontSize: '10pt', display: 'block', marginBottom: '2px' }}>CBC - Complete Blood Count</strong>
                   <table style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000' }}>
                     <thead>
                       <tr>
@@ -489,7 +488,7 @@ function PrescriptionWriter() {
 
               {hasInvestigationData('rbs') && (
                 <div style={{ marginBottom: '6px' }}>
-                  <div style={{ fontSize: '10pt', fontWeight: '700', marginBottom: '2px' }}>RBS (Random Blood Sugar)</div>
+                  <strong style={{ fontSize: '10pt', display: 'block', marginBottom: '2px' }}>RBS (Random Blood Sugar)</strong>
                   <table style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000' }}>
                     <thead>
                       <tr>
@@ -509,7 +508,7 @@ function PrescriptionWriter() {
 
               {hasInvestigationData('lft') && (
                 <div style={{ marginBottom: '6px' }}>
-                  <div style={{ fontSize: '10pt', fontWeight: '700', marginBottom: '2px' }}>Liver Function Test LFT</div>
+                  <strong style={{ fontSize: '10pt', display: 'block', marginBottom: '2px' }}>Liver Function Test LFT</strong>
                   <table style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000' }}>
                     <thead>
                       <tr>
@@ -558,20 +557,23 @@ function PrescriptionWriter() {
         {/* ===== MEDICATIONS TABLE ===== */}
         <div style={{ marginTop: '8px', marginBottom: '8px' }}>
           {formData.medications.length > 0 && (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10.5pt', border: '1px solid #000' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10.5pt', border: '1px solid #000', tableLayout: 'fixed' }}>
+              <colgroup>
+                <col style={{ width: '40px' }} />   {/* Rx */}
+                <col style={{ width: 'auto' }} />    {/* Name */}
+                <col style={{ width: '160px' }} />   {/* Frequency */}
+                <col style={{ width: '80px' }} />    {/* Duration */}
+                <col style={{ width: '120px' }} />   {/* Timing */}
+                <col className="no-print" style={{ width: '34px' }} />  {/* Delete */}
+              </colgroup>
               <thead>
                 <tr style={{ backgroundColor: '#f9f9f9' }}>
-                  {/* FIX: Rx column header - numbers only, no sub-text */}
-                  <th style={{ padding: '5px 6px', border: '1px solid #000', textAlign: 'center', width: '35px' }}>Rx</th>
-                  {/* FIX: Name column - tablet details */}
+                  <th style={{ padding: '5px 6px', border: '1px solid #000', textAlign: 'center' }}>Rx</th>
                   <th style={{ padding: '5px 6px', border: '1px solid #000', textAlign: 'left' }}>नाम</th>
-                  {/* FIX: Frequency column - 1 tablet, how many times */}
-                  <th style={{ padding: '5px 6px', border: '1px solid #000', textAlign: 'center', width: '150px' }}>आवृत्ति</th>
-                  {/* FIX: Duration column - number of days */}
-                  <th style={{ padding: '5px 6px', border: '1px solid #000', textAlign: 'center', width: '75px' }}>अवधि</th>
-                  {/* FIX: Timing/Notes column - before/after sleep in Hindi */}
-                  <th style={{ padding: '5px 6px', border: '1px solid #000', textAlign: 'center', width: '110px' }}>टिप्पणियाँ</th>
-                  <th className="no-print" style={{ padding: '4px', border: '1px solid #000', width: '30px' }}></th>
+                  <th style={{ padding: '5px 6px', border: '1px solid #000', textAlign: 'center' }}>आवृत्ति</th>
+                  <th style={{ padding: '5px 6px', border: '1px solid #000', textAlign: 'center' }}>अवधि</th>
+                  <th style={{ padding: '5px 6px', border: '1px solid #000', textAlign: 'center' }}>टिप्पणियाँ</th>
+                  <th className="no-print" style={{ padding: '4px', border: '1px solid #000' }}></th>
                 </tr>
               </thead>
               <tbody>
