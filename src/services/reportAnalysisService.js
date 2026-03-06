@@ -83,43 +83,52 @@ class ReportAnalysisService {
    * Analyze lab report and detect abnormalities
    */
   async analyzeReport(reportData) {
-    const analysis = {
-      reportId: reportData.id,
-      timestamp: new Date().toISOString(),
-      abnormalities: [],
-      criticalFindings: [],
-      warnings: [],
-      recommendations: [],
-      overallRisk: 'normal'
-    };
+    const normalTests = [];
+    const abnormalTests = [];
+    const criticalFindings = [];
+    let overallRisk = 'normal';
+
+    // Use gender and age from reportData (handle both field naming conventions)
+    const gender = reportData.gender || reportData.patientGender || null;
+    const age = reportData.age || reportData.patientAge || null;
 
     // Parse and analyze each test value
     for (const test of reportData.tests || []) {
-      const testAnalysis = this.analyzeTest(test, reportData.patientGender, reportData.patientAge);
+      const testAnalysis = this.analyzeTest(test, gender, age);
 
       if (testAnalysis.abnormal) {
-        analysis.abnormalities.push(testAnalysis);
+        abnormalTests.push(testAnalysis);
 
         if (testAnalysis.severity === 'critical') {
-          analysis.criticalFindings.push(testAnalysis);
-          analysis.overallRisk = 'critical';
-        } else if (testAnalysis.severity === 'high' && analysis.overallRisk !== 'critical') {
-          analysis.overallRisk = 'high';
-        } else if (testAnalysis.severity === 'moderate' && analysis.overallRisk === 'normal') {
-          analysis.overallRisk = 'moderate';
+          criticalFindings.push(testAnalysis);
+          overallRisk = 'critical';
+        } else if (testAnalysis.severity === 'high' && overallRisk !== 'critical') {
+          overallRisk = 'high';
+        } else if (testAnalysis.severity === 'moderate' && overallRisk === 'normal') {
+          overallRisk = 'moderate';
         }
+      } else {
+        normalTests.push(testAnalysis);
       }
     }
 
-    // Generate warnings and recommendations
-    analysis.warnings = this.generateWarnings(analysis.abnormalities);
-    analysis.recommendations = this.generateRecommendations(analysis.abnormalities);
+    const analysis = {
+      reportId: reportData.id,
+      timestamp: new Date().toISOString(),
+      totalTests: (reportData.tests || []).length,
+      normalTests,
+      abnormalTests,
+      criticalFindings,
+      warnings: this.generateWarnings(abnormalTests),
+      recommendations: this.generateRecommendations(abnormalTests).map(r => r.action),
+      overallRisk
+    };
 
     // Save analysis to database
-    await this.saveAnalysis(analysis, reportData.patientId);
+    await this.saveAnalysis(analysis, reportData);
 
     // Notify doctor if critical findings
-    if (analysis.criticalFindings.length > 0) {
+    if (criticalFindings.length > 0) {
       await this.notifyDoctor(analysis, reportData);
     }
 
@@ -343,14 +352,30 @@ class ReportAnalysisService {
   /**
    * Save analysis to database
    */
-  async saveAnalysis(analysis, patientId) {
+  async saveAnalysis(analysis, reportData) {
+    const patientId = typeof reportData === 'object' ? reportData.patientId : reportData;
+
+    // Build results array compatible with PatientDetails display
+    const allTests = [...(analysis.normalTests || []), ...(analysis.abnormalTests || [])];
+    const results = allTests.map(t => ({
+      testName: t.testName,
+      value: t.value,
+      unit: t.unit || '',
+      range: t.normalRange || '',
+      status: t.status || 'Normal'
+    }));
+
     await db.labReports.add({
       patientId: patientId,
+      uhid: typeof reportData === 'object' ? reportData.uhid : null,
+      testType: 'Lab Analysis',
+      results,
       analysisData: analysis,
-      abnormalitiesCount: analysis.abnormalities.length,
-      criticalCount: analysis.criticalFindings.length,
+      abnormalitiesCount: (analysis.abnormalTests || []).length,
+      criticalCount: (analysis.criticalFindings || []).length,
       overallRisk: analysis.overallRisk,
       createdAt: new Date().toISOString(),
+      syncStatus: 'pending',
       reviewed: false
     });
   }
@@ -359,14 +384,19 @@ class ReportAnalysisService {
    * Notify doctor of critical findings
    */
   async notifyDoctor(analysis, reportData) {
+    const criticalNames = analysis.criticalFindings.map(f => f.testName).join(', ');
     // Create alert in database
     await db.alerts?.add({
-      type: 'critical_lab_result',
+      type: 'lab_critical',
       patientId: reportData.patientId,
-      patientName: reportData.patientName,
-      message: `Critical lab findings for ${reportData.patientName}`,
-      details: analysis.criticalFindings,
-      priority: 'urgent',
+      priority: 'critical',
+      title: `Critical Lab Results - ${reportData.patientName || 'Patient'}`,
+      message: `Critical values detected: ${criticalNames}`,
+      metadata: {
+        patientName: reportData.patientName,
+        uhid: reportData.uhid,
+        details: analysis.criticalFindings
+      },
       createdAt: new Date().toISOString(),
       read: false
     });

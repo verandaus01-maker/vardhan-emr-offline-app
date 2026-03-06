@@ -42,14 +42,19 @@ function VitalsRecorder() {
         uhid: patient.uhid,
         date: new Date().toISOString(),
         recordedBy: 'Dr. Vivek Raj Singh',
-        bloodPressure: `${vitals.bloodPressureSystolic}/${vitals.bloodPressureDiastolic}`,
-        heartRate: vitals.heartRate,
+        systolic: vitals.bloodPressureSystolic ? parseInt(vitals.bloodPressureSystolic) : null,
+        diastolic: vitals.bloodPressureDiastolic ? parseInt(vitals.bloodPressureDiastolic) : null,
+        pulse: vitals.heartRate,
         temperature: vitals.temperature,
         weight: vitals.weight,
         height: vitals.height,
         spo2: vitals.spo2,
         bloodSugar: vitals.bloodSugar,
-        notes: vitals.notes
+        bmi: vitals.weight && vitals.height
+          ? (parseFloat(vitals.weight) / Math.pow(parseFloat(vitals.height) / 100, 2)).toFixed(1)
+          : null,
+        notes: vitals.notes,
+        syncStatus: 'pending'
       };
 
       await DatabaseService.addVitals(vitalsData);
