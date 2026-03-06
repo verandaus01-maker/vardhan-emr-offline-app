@@ -242,6 +242,7 @@ function PrescriptionWriter() {
         diagnosis: formData.diagnosis,
         investigations: formData.investigations,
         advisedInvestigations: formData.advisedInvestigations,
+        nextVisit: formData.nextVisit || '',
         medications: formData.medications
       };
 
@@ -753,6 +754,22 @@ function PrescriptionWriter() {
         {formData.advisedInvestigations && (
           <div className="print-only" style={{ marginBottom: '6px', fontSize: '11pt' }}>
             <strong>Advised Investigations:</strong> {formData.advisedInvestigations}
+          </div>
+        )}
+
+        {/* Next Visit */}
+        <div className="no-print" style={{ marginBottom: '8px' }}>
+          <strong style={{ fontSize: '11pt' }}>Next Visit:</strong>
+          <input
+            type="date"
+            value={formData.nextVisit || ''}
+            onChange={(e) => setFormData({ ...formData, nextVisit: e.target.value })}
+            style={{ fontSize: '10.5pt', padding: '4px 6px', border: '1px solid #ccc', borderRadius: '3px', marginTop: '3px', marginLeft: '8px' }}
+          />
+        </div>
+        {formData.nextVisit && (
+          <div className="print-only" style={{ marginBottom: '6px', fontSize: '11pt' }}>
+            <strong>Next Visit:</strong> {format(new Date(formData.nextVisit), 'dd-MM-yyyy')}
           </div>
         )}
       </div>
