@@ -39,6 +39,12 @@ db.version(3).stores({
   users: '++id, &username, email, role, isActive, createdAt, lastLogin'
 });
 
+// Version 4: Add compound indexes for appointments and dailyStats queries
+db.version(4).stores({
+  appointments: '++id, patientId, uhid, date, status, doctorId, syncStatus, createdAt, [date+doctorId]',
+  dailyStats: '++id, date, doctorId, totalPatients, totalPrescriptions, [date+doctorId]'
+});
+
 // Database helper functions
 export class DatabaseService {
   // Expose db instance for direct access

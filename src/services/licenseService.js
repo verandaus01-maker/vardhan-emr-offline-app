@@ -10,7 +10,7 @@ class LicenseService {
     this.LICENSED_TO = 'Vardhan Hospital';
     this.LICENSED_LOCATION = 'Varanasi';
     this.LICENSE_EXPIRY = '2026-12-31'; // 1 year from deployment
-    this.MAX_USERS = 5;
+    this.MAX_USERS = 20;
     this.PRODUCT_VERSION = '1.0';
   }
 
