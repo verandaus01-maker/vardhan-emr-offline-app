@@ -533,6 +533,9 @@ function PrescriptionWriter() {
               margin-right: 10mm;
             }
           }
+          .inv-table th {
+            font-weight: normal !important;
+          }
         `}</style>
 
         {/* Patient Info */}
@@ -787,7 +790,7 @@ function PrescriptionWriter() {
               {hasInvestigationData('kft') && (
                 <div style={{ marginBottom: '6px' }}>
                   <strong style={{ fontSize: '10pt', display: 'block', marginBottom: '2px' }}>Kidney Function Test KFT</strong>
-                  <table style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000', width: 'auto' }}>
+                  <table className="inv-table" style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000', width: 'auto' }}>
                     <thead><tr>
                       <th style={{ padding: '3px 6px', border: '1px solid #000' }}>Date</th>
                       <th style={{ padding: '3px 6px', border: '1px solid #000' }}>S. Uric acid</th>
@@ -808,7 +811,7 @@ function PrescriptionWriter() {
               {hasInvestigationData('cbc') && (
                 <div style={{ marginBottom: '6px' }}>
                   <strong style={{ fontSize: '10pt', display: 'block', marginBottom: '2px' }}>CBC - Complete Blood Count</strong>
-                  <table style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000', width: 'auto' }}>
+                  <table className="inv-table" style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000', width: 'auto' }}>
                     <thead><tr>
                       <th style={{ padding: '3px 6px', border: '1px solid #000' }}>Date</th>
                       <th style={{ padding: '3px 6px', border: '1px solid #000' }}>Hemoglobin</th>
@@ -829,7 +832,7 @@ function PrescriptionWriter() {
               {hasInvestigationData('fbs') && (
                 <div style={{ marginBottom: '6px' }}>
                   <strong style={{ fontSize: '10pt', display: 'block', marginBottom: '2px' }}>FBS - Fasting Blood Sugar</strong>
-                  <table style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000', width: 'auto' }}>
+                  <table className="inv-table" style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000', width: 'auto' }}>
                     <thead><tr>
                       <th style={{ padding: '3px 6px', border: '1px solid #000' }}>Date</th>
                       <th style={{ padding: '3px 6px', border: '1px solid #000' }}>Fasting Blood Sugar</th>
@@ -846,7 +849,7 @@ function PrescriptionWriter() {
               {hasInvestigationData('rbs') && (
                 <div style={{ marginBottom: '6px' }}>
                   <strong style={{ fontSize: '10pt', display: 'block', marginBottom: '2px' }}>RBS (Random Blood Sugar)</strong>
-                  <table style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000', width: 'auto' }}>
+                  <table className="inv-table" style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000', width: 'auto' }}>
                     <thead><tr>
                       <th style={{ padding: '3px 6px', border: '1px solid #000' }}>Date</th>
                       <th style={{ padding: '3px 6px', border: '1px solid #000' }}>Random Blood Sugar</th>
@@ -863,7 +866,7 @@ function PrescriptionWriter() {
               {hasInvestigationData('ppbs') && (
                 <div style={{ marginBottom: '6px' }}>
                   <strong style={{ fontSize: '10pt', display: 'block', marginBottom: '2px' }}>PPBS - Post Prandial Blood Sugar Test</strong>
-                  <table style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000', width: 'auto' }}>
+                  <table className="inv-table" style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000', width: 'auto' }}>
                     <thead><tr>
                       <th style={{ padding: '3px 6px', border: '1px solid #000' }}>Date</th>
                       <th style={{ padding: '3px 6px', border: '1px solid #000' }}>Post Prandial Blood Sugar</th>
@@ -880,7 +883,7 @@ function PrescriptionWriter() {
               {hasInvestigationData('hba1c') && (
                 <div style={{ marginBottom: '6px' }}>
                   <strong style={{ fontSize: '10pt', display: 'block', marginBottom: '2px' }}>HbA1c (Glycated Hemoglobin)</strong>
-                  <table style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000', width: 'auto' }}>
+                  <table className="inv-table" style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000', width: 'auto' }}>
                     <thead><tr>
                       <th style={{ padding: '3px 6px', border: '1px solid #000' }}>Date</th>
                       <th style={{ padding: '3px 6px', border: '1px solid #000' }}>HbA1c</th>
@@ -897,7 +900,7 @@ function PrescriptionWriter() {
               {hasInvestigationData('lft') && (
                 <div style={{ marginBottom: '6px' }}>
                   <strong style={{ fontSize: '10pt', display: 'block', marginBottom: '2px' }}>Liver Function Test LFT</strong>
-                  <table style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000', width: 'auto' }}>
+                  <table className="inv-table" style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000', width: 'auto' }}>
                     <thead><tr>
                       <th style={{ padding: '3px 6px', border: '1px solid #000' }}>Date</th>
                       <th style={{ padding: '3px 6px', border: '1px solid #000' }}>SGPT (ALT)</th>
@@ -918,7 +921,7 @@ function PrescriptionWriter() {
               {hasInvestigationData('lipid') && (
                 <div style={{ marginBottom: '6px' }}>
                   <strong style={{ fontSize: '10pt', display: 'block', marginBottom: '2px' }}>Lipid Profile</strong>
-                  <table style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000', width: 'auto' }}>
+                  <table className="inv-table" style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000', width: 'auto' }}>
                     <thead><tr>
                       <th style={{ padding: '3px 6px', border: '1px solid #000' }}>Date</th>
                       {formData.investigations.lipid.totalCholesterol && <th style={{ padding: '3px 6px', border: '1px solid #000' }}>Total Cholesterol</th>}
@@ -943,7 +946,7 @@ function PrescriptionWriter() {
               {hasInvestigationData('tsh') && (
                 <div style={{ marginBottom: '6px' }}>
                   <strong style={{ fontSize: '10pt', display: 'block', marginBottom: '2px' }}>TSH - Thyroid Stimulating Hormone</strong>
-                  <table style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000', width: 'auto' }}>
+                  <table className="inv-table" style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000', width: 'auto' }}>
                     <thead><tr>
                       <th style={{ padding: '3px 6px', border: '1px solid #000' }}>Date</th>
                       <th style={{ padding: '3px 6px', border: '1px solid #000' }}>TSH</th>
@@ -960,7 +963,7 @@ function PrescriptionWriter() {
               {hasInvestigationData('thyroidFull') && (
                 <div style={{ marginBottom: '6px' }}>
                   <strong style={{ fontSize: '10pt', display: 'block', marginBottom: '2px' }}>Thyroid Function Test (T3/T4/TSH)</strong>
-                  <table style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000', width: 'auto' }}>
+                  <table className="inv-table" style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000', width: 'auto' }}>
                     <thead><tr>
                       <th style={{ padding: '3px 6px', border: '1px solid #000' }}>Date</th>
                       {formData.investigations.thyroidFull.tsh && <th style={{ padding: '3px 6px', border: '1px solid #000' }}>TSH</th>}
@@ -981,7 +984,7 @@ function PrescriptionWriter() {
               {hasInvestigationData('bnp') && (
                 <div style={{ marginBottom: '6px' }}>
                   <strong style={{ fontSize: '10pt', display: 'block', marginBottom: '2px' }}>BNP / NT-proBNP</strong>
-                  <table style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000', width: 'auto' }}>
+                  <table className="inv-table" style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000', width: 'auto' }}>
                     <thead><tr>
                       <th style={{ padding: '3px 6px', border: '1px solid #000' }}>Date</th>
                       <th style={{ padding: '3px 6px', border: '1px solid #000' }}>BNP / NT-proBNP</th>
@@ -998,7 +1001,7 @@ function PrescriptionWriter() {
               {hasInvestigationData('electrolytes') && (
                 <div style={{ marginBottom: '6px' }}>
                   <strong style={{ fontSize: '10pt', display: 'block', marginBottom: '2px' }}>Electrolytes</strong>
-                  <table style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000', width: 'auto' }}>
+                  <table className="inv-table" style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000', width: 'auto' }}>
                     <thead><tr>
                       <th style={{ padding: '3px 6px', border: '1px solid #000' }}>Date</th>
                       {formData.investigations.electrolytes.sodium && <th style={{ padding: '3px 6px', border: '1px solid #000' }}>Sodium (Na+)</th>}
@@ -1019,7 +1022,7 @@ function PrescriptionWriter() {
               {hasInvestigationData('enzymes') && (
                 <div style={{ marginBottom: '6px' }}>
                   <strong style={{ fontSize: '10pt', display: 'block', marginBottom: '2px' }}>Cardiac Enzymes</strong>
-                  <table style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000', width: 'auto' }}>
+                  <table className="inv-table" style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000', width: 'auto' }}>
                     <thead><tr>
                       <th style={{ padding: '3px 6px', border: '1px solid #000' }}>Date</th>
                       {formData.investigations.enzymes.ck && <th style={{ padding: '3px 6px', border: '1px solid #000' }}>CK Total</th>}
@@ -1040,7 +1043,7 @@ function PrescriptionWriter() {
               {hasInvestigationData('bloodGlucose') && (
                 <div style={{ marginBottom: '6px' }}>
                   <strong style={{ fontSize: '10pt', display: 'block', marginBottom: '2px' }}>Blood Glucose Estimation</strong>
-                  <table style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000', width: 'auto' }}>
+                  <table className="inv-table" style={{ borderCollapse: 'collapse', fontSize: '10pt', border: '1px solid #000', width: 'auto' }}>
                     <thead><tr>
                       <th style={{ padding: '3px 6px', border: '1px solid #000' }}>Date</th>
                       {formData.investigations.bloodGlucose.fasting && <th style={{ padding: '3px 6px', border: '1px solid #000' }}>Fasting</th>}
