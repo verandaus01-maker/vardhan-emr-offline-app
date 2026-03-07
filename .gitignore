@@ -8,7 +8,7 @@ coverage/
 
 # Production
 /build
-dist/
+# dist/ intentionally tracked so hospital server always serves latest pre-built app
 
 # Misc
 .DS_Store
