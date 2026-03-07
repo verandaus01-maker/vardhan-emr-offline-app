@@ -6,6 +6,7 @@ import {
   FlaskConical, Pill, Stethoscope, Heart, Clock, ChevronDown, ChevronUp, X
 } from 'lucide-react';
 import DatabaseService from '../services/database';
+import authService from '../services/authService';
 import { format } from 'date-fns';
 
 function PatientDetails() {
@@ -334,30 +335,32 @@ function PatientDetails() {
         </div>
       </div>
 
-      {/* Quick Action Buttons */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <button
-          onClick={() => navigate(`/prescription/${patientId}`)}
-          className="btn-primary flex items-center justify-center space-x-3 py-6 text-lg"
-        >
-          <FileText className="w-6 h-6" />
-          <span>New Prescription</span>
-        </button>
-        <button
-          onClick={() => navigate(`/vitals/${patientId}`)}
-          className="btn-success flex items-center justify-center space-x-3 py-6 text-lg"
-        >
-          <Activity className="w-6 h-6" />
-          <span>Record Vitals</span>
-        </button>
-        <button
-          onClick={() => navigate(`/lab-reports`)}
-          className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-6 rounded-lg font-semibold transition shadow-lg flex items-center justify-center space-x-3 text-lg"
-        >
-          <FlaskConical className="w-6 h-6" />
-          <span>Add Lab Report</span>
-        </button>
-      </div>
+      {/* Quick Action Buttons — write-access only */}
+      {authService.canWrite() && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <button
+            onClick={() => navigate(`/prescription/${patientId}`)}
+            className="btn-primary flex items-center justify-center space-x-3 py-6 text-lg"
+          >
+            <FileText className="w-6 h-6" />
+            <span>New Prescription</span>
+          </button>
+          <button
+            onClick={() => navigate(`/vitals/${patientId}`)}
+            className="btn-success flex items-center justify-center space-x-3 py-6 text-lg"
+          >
+            <Activity className="w-6 h-6" />
+            <span>Record Vitals</span>
+          </button>
+          <button
+            onClick={() => navigate(`/lab-reports`)}
+            className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-6 rounded-lg font-semibold transition shadow-lg flex items-center justify-center space-x-3 text-lg"
+          >
+            <FlaskConical className="w-6 h-6" />
+            <span>Add Lab Report</span>
+          </button>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex space-x-2 border-b-2 border-gray-200">
