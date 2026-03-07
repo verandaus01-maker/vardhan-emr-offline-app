@@ -10,6 +10,64 @@ class AuthService {
   constructor() {
     this.currentUser = null;
     this.isAuthenticated = false;
+    this.serverUrl = null; // Set from settings (docOnApiUrl)
+  }
+
+  /**
+   * Get the central sync server URL from settings
+   */
+  async getServerUrl() {
+    if (this.serverUrl) return this.serverUrl;
+    const url = await DatabaseService.getSetting('docOnApiUrl');
+    this.serverUrl = url || null;
+    return this.serverUrl;
+  }
+
+  /**
+   * Try to authenticate against the central server
+   */
+  async loginWithServer(username, password) {
+    const serverUrl = await this.getServerUrl();
+    if (!serverUrl) return null;
+    try {
+      const res = await fetch(`${serverUrl}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+        signal: AbortSignal.timeout(4000)
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null; // Server unreachable — fall through to local
+    }
+  }
+
+  /**
+   * Sync users from central server to local IndexedDB so all device logins work offline
+   */
+  async syncUsersFromServer() {
+    const serverUrl = await this.getServerUrl();
+    if (!serverUrl) return;
+    try {
+      const res = await fetch(`${serverUrl}/api/auth/users`, { signal: AbortSignal.timeout(4000) });
+      if (!res.ok) return;
+      const serverUsers = await res.json();
+      for (const u of serverUsers) {
+        const existing = await db.users.where('username').equalsIgnoreCase(u.username).first();
+        if (!existing) {
+          // Add server user locally with a dummy hashed password marker
+          // The real auth will go to server; local is for offline fallback
+          await db.users.add({
+            ...u,
+            password: u.password || await bcrypt.hash('__server_auth__', 4),
+            isActive: u.isActive === 1 || u.isActive === true,
+          });
+        }
+      }
+    } catch {
+      // Ignore sync errors — offline mode will use local users
+    }
   }
 
   /**
@@ -61,10 +119,29 @@ class AuthService {
   }
 
   /**
-   * Login with username and password
+   * Login — tries central server first, then local IndexedDB (offline fallback)
    */
   async login(username, password) {
     try {
+      // ── Step 1: Try central server ──────────────────────────────────────
+      const serverResult = await this.loginWithServer(username, password);
+      if (serverResult?.success) {
+        const serverUser = serverResult.user;
+        this.currentUser = { ...serverUser, _authSource: 'server' };
+        this.isAuthenticated = true;
+        localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
+
+        // Sync server users to local in background
+        this.syncUsersFromServer().catch(() => {});
+
+        return { success: true, user: this.currentUser };
+      }
+      if (serverResult && !serverResult.success) {
+        // Server reachable but credentials wrong — don't fall through
+        throw new Error(serverResult.error || 'Invalid username or password');
+      }
+
+      // ── Step 2: Local IndexedDB (offline / server unreachable) ──────────
       const user = await db.users
         .where('username')
         .equalsIgnoreCase(username)
@@ -73,40 +150,26 @@ class AuthService {
       if (!user) {
         throw new Error('Invalid username or password');
       }
-
       if (!user.isActive) {
         throw new Error('Account is disabled. Contact administrator.');
       }
 
-      // Verify password
       const isValid = await bcrypt.compare(password, user.password);
       if (!isValid) {
         throw new Error('Invalid username or password');
       }
 
-      // Update last login
-      await db.users.update(user.id, {
-        lastLogin: new Date().toISOString()
-      });
+      await db.users.update(user.id, { lastLogin: new Date().toISOString() });
 
-      // Set current user (exclude password)
       const { password: _, ...userWithoutPassword } = user;
-      this.currentUser = userWithoutPassword;
+      this.currentUser = { ...userWithoutPassword, _authSource: 'local' };
       this.isAuthenticated = true;
-
-      // Store session
       localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
 
-      return {
-        success: true,
-        user: this.currentUser
-      };
+      return { success: true, user: this.currentUser };
     } catch (error) {
       console.error('Login failed:', error);
-      return {
-        success: false,
-        error: error.message
-      };
+      return { success: false, error: error.message };
     }
   }
 
@@ -280,54 +343,41 @@ class AuthService {
   }
 
   /**
-   * Get default permissions for role
+   * Check if current user can write/edit data (not read-only).
+   * Only admin and doctor have write access.
+   */
+  canWrite() {
+    if (!this.currentUser) return false;
+    return this.currentUser.role === 'admin' || this.currentUser.role === 'doctor';
+  }
+
+  /**
+   * Get default permissions for role.
+   * Doctor = full clinical access (like admin minus user management).
+   * All others = read-only.
    */
   getDefaultPermissions(role) {
+    const FULL_CLINICAL = [
+      'view_patients', 'edit_patients', 'add_patients',
+      'view_prescriptions', 'create_prescriptions',
+      'view_vitals', 'record_vitals',
+      'view_appointments', 'create_appointments', 'manage_appointments',
+      'view_lab_reports', 'add_lab_reports', 'analyze_lab_reports',
+      'view_reports', 'manage_data', 'backup_restore'
+    ];
+    const READ_ONLY = [
+      'view_patients', 'view_prescriptions',
+      'view_vitals', 'view_appointments', 'view_lab_reports'
+    ];
     const rolePermissions = {
       'admin': ['all'],
-      'doctor': [
-        'view_patients',
-        'edit_patients',
-        'add_patients',
-        'view_prescriptions',
-        'create_prescriptions',
-        'view_vitals',
-        'record_vitals',
-        'view_appointments',
-        'create_appointments',
-        'view_lab_reports',
-        'analyze_lab_reports',
-        'view_reports'
-      ],
-      'nurse': [
-        'view_patients',
-        'view_prescriptions',
-        'view_vitals',
-        'record_vitals',
-        'view_appointments',
-        'view_lab_reports'
-      ],
-      'receptionist': [
-        'view_patients',
-        'add_patients',
-        'edit_patients',
-        'view_appointments',
-        'create_appointments',
-        'manage_appointments'
-      ],
-      'lab_technician': [
-        'view_patients',
-        'view_lab_reports',
-        'add_lab_reports',
-        'analyze_lab_reports'
-      ],
-      'staff': [
-        'view_patients',
-        'view_appointments'
-      ]
+      'doctor': FULL_CLINICAL,
+      'nurse': READ_ONLY,
+      'receptionist': READ_ONLY,
+      'lab_technician': READ_ONLY,
+      'staff': READ_ONLY
     };
-
-    return rolePermissions[role] || rolePermissions['staff'];
+    return rolePermissions[role] || READ_ONLY;
   }
 
   /**

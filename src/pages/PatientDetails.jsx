@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   User, Phone, Mail, MapPin, Droplet, AlertTriangle, FileText,
   Activity, Calendar, Edit, Printer, ArrowLeft, Plus, TrendingUp,
-  FlaskConical, Pill, Stethoscope, Heart, Clock, ChevronDown, ChevronUp
+  FlaskConical, Pill, Stethoscope, Heart, Clock, ChevronDown, ChevronUp, X
 } from 'lucide-react';
 import DatabaseService from '../services/database';
 import { format } from 'date-fns';
@@ -18,6 +18,8 @@ function PatientDetails() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview'); // overview, vitals, labs, prescriptions
   const [expandedPrescription, setExpandedPrescription] = useState(null);
+  const [printingPrescription, setPrintingPrescription] = useState(null);
+  const printRef = useRef(null);
 
   useEffect(() => {
     loadPatientData();
@@ -135,6 +137,16 @@ function PatientDetails() {
     }
 
     return [];
+  };
+
+  const handlePrintPrescription = (prescription) => {
+    setPrintingPrescription(prescription);
+    document.body.classList.add('rx-print-mode');
+    setTimeout(() => {
+      window.print();
+      document.body.classList.remove('rx-print-mode');
+      setPrintingPrescription(null);
+    }, 400);
   };
 
   if (loading) {
@@ -260,33 +272,48 @@ function PatientDetails() {
         </div>
       </div>
 
-      {/* Quick Stats */}
+      {/* Quick Stats — all clickable */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="card bg-gradient-to-br from-blue-500 to-blue-600 text-white">
+        <div
+          className="card bg-gradient-to-br from-blue-500 to-blue-600 text-white cursor-pointer hover:shadow-xl hover:scale-105 transition-transform"
+          onClick={() => setActiveTab('prescriptions')}
+          title="View Prescriptions"
+        >
           <div className="flex items-center justify-between">
             <div>
               <p className="text-blue-100 text-sm mb-1">Total Visits</p>
               <p className="text-3xl font-bold">{prescriptions.length}</p>
+              <p className="text-xs text-blue-200 mt-1">Click to view →</p>
             </div>
             <Calendar className="w-12 h-12 text-blue-200" />
           </div>
         </div>
 
-        <div className="card bg-gradient-to-br from-green-500 to-green-600 text-white">
+        <div
+          className="card bg-gradient-to-br from-green-500 to-green-600 text-white cursor-pointer hover:shadow-xl hover:scale-105 transition-transform"
+          onClick={() => setActiveTab('vitals')}
+          title="View Vitals"
+        >
           <div className="flex items-center justify-between">
             <div>
               <p className="text-green-100 text-sm mb-1">Vitals Recorded</p>
               <p className="text-3xl font-bold">{vitals.length}</p>
+              <p className="text-xs text-green-200 mt-1">Click to view →</p>
             </div>
             <Activity className="w-12 h-12 text-green-200" />
           </div>
         </div>
 
-        <div className="card bg-gradient-to-br from-purple-500 to-purple-600 text-white">
+        <div
+          className="card bg-gradient-to-br from-purple-500 to-purple-600 text-white cursor-pointer hover:shadow-xl hover:scale-105 transition-transform"
+          onClick={() => setActiveTab('labs')}
+          title="View Lab Reports"
+        >
           <div className="flex items-center justify-between">
             <div>
               <p className="text-purple-100 text-sm mb-1">Lab Reports</p>
               <p className="text-3xl font-bold">{labReports.length}</p>
+              <p className="text-xs text-purple-200 mt-1">Click to view →</p>
             </div>
             <FlaskConical className="w-12 h-12 text-purple-200" />
           </div>
@@ -526,11 +553,20 @@ function PatientDetails() {
                             <p className="text-sm text-gray-500">Dr. Vivek Raj Singh</p>
                           </div>
                         </div>
-                        {isExpanded ? (
-                          <ChevronUp className="w-6 h-6 text-gray-400" />
-                        ) : (
-                          <ChevronDown className="w-6 h-6 text-gray-400" />
-                        )}
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handlePrintPrescription(prescription); }}
+                            className="p-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition"
+                            title="Print this prescription"
+                          >
+                            <Printer className="w-5 h-5" />
+                          </button>
+                          {isExpanded ? (
+                            <ChevronUp className="w-6 h-6 text-gray-400" />
+                          ) : (
+                            <ChevronDown className="w-6 h-6 text-gray-400" />
+                          )}
+                        </div>
                       </div>
 
                       {prescription.diagnosis && (
@@ -772,6 +808,103 @@ function PatientDetails() {
           </div>
         )}
       </div>
+
+      {/* Print Prescription Overlay — only shown during print */}
+      {printingPrescription && (() => {
+        const rx = printingPrescription;
+        const meds = parseMedications(rx.medications);
+        return (
+          <div className="print-only fixed inset-0 bg-white z-[9999] p-8" ref={printRef}>
+            {/* Hospital Header */}
+            <div className="text-center border-b-2 border-gray-800 pb-4 mb-4">
+              <h1 className="text-3xl font-bold text-blue-800">Vardhan Hospital</h1>
+              <p className="text-gray-600">A-125/D, Lalpur Housing Scheme, Varanasi - 221003</p>
+              <p className="text-gray-600">Ph: +91 542 2367890</p>
+            </div>
+            {/* Doctor */}
+            <div className="flex justify-between mb-4">
+              <div>
+                <p className="font-bold text-lg">Dr. Vivek Raj Singh</p>
+                <p className="text-gray-600 text-sm">MD (Cardiology)</p>
+              </div>
+              <div className="text-right">
+                <p className="text-gray-600 text-sm">Date: {format(new Date(rx.createdAt), 'dd/MM/yyyy')}</p>
+                <p className="text-gray-600 text-sm">Rx No: #{rx.id}</p>
+              </div>
+            </div>
+            {/* Patient */}
+            <div className="border border-gray-300 rounded p-3 mb-4 bg-gray-50">
+              <div className="grid grid-cols-3 gap-2 text-sm">
+                <div><span className="font-semibold">Patient:</span> {patient.name}</div>
+                <div><span className="font-semibold">Age/Sex:</span> {patient.age}Y / {patient.gender?.[0]}</div>
+                <div><span className="font-semibold">UHID:</span> {patient.uhid}</div>
+                {patient.phone && <div><span className="font-semibold">Phone:</span> {patient.phone}</div>}
+                {patient.bloodGroup && <div><span className="font-semibold">Blood:</span> {patient.bloodGroup}</div>}
+              </div>
+            </div>
+            {/* Diagnosis */}
+            {rx.diagnosis && (
+              <div className="mb-4">
+                <p className="font-bold text-gray-800 mb-1">Diagnosis:</p>
+                <p className="text-gray-800 bg-yellow-50 p-2 rounded">{rx.diagnosis}</p>
+              </div>
+            )}
+            {/* Complaints */}
+            {rx.complaints && (
+              <div className="mb-4">
+                <p className="font-bold text-gray-800 mb-1">Complaints:</p>
+                <p className="text-gray-700">{rx.complaints}</p>
+              </div>
+            )}
+            {/* Medications */}
+            {meds.length > 0 && (
+              <div className="mb-4">
+                <p className="font-bold text-gray-800 mb-2 text-lg">℞ Medications:</p>
+                <table className="w-full border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b-2 border-gray-800">
+                      <th className="text-left py-1 pr-4">#</th>
+                      <th className="text-left py-1 pr-4">Medicine</th>
+                      <th className="text-left py-1 pr-4">Dosage</th>
+                      <th className="text-left py-1 pr-4">Frequency</th>
+                      <th className="text-left py-1">Duration</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {meds.map((med, idx) => (
+                      <tr key={idx} className="border-b border-gray-200">
+                        <td className="py-1 pr-4">{idx + 1}.</td>
+                        <td className="py-1 pr-4 font-semibold">{typeof med === 'string' ? med : (med.drugName || '-')}</td>
+                        <td className="py-1 pr-4">{typeof med === 'object' ? (med.dosage || '-') : '-'}</td>
+                        <td className="py-1 pr-4">{typeof med === 'object' ? (med.frequency || '-') : '-'}</td>
+                        <td className="py-1">{typeof med === 'object' ? (med.duration || '-') : '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {/* Advice / Notes */}
+            {(rx.advice || rx.notes) && (
+              <div className="mb-4 p-3 bg-green-50 rounded">
+                <p className="font-bold text-gray-800 mb-1">Advice:</p>
+                <p className="text-gray-700">{rx.advice || rx.notes}</p>
+              </div>
+            )}
+            {/* Follow-up */}
+            {rx.nextVisit && (
+              <p className="text-gray-600 mt-2">Next Visit: {rx.nextVisit}</p>
+            )}
+            {/* Signature */}
+            <div className="mt-8 border-t pt-4 flex justify-end">
+              <div className="text-center">
+                <p className="font-bold">Dr. Vivek Raj Singh</p>
+                <p className="text-xs text-gray-500">Signature & Stamp</p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
