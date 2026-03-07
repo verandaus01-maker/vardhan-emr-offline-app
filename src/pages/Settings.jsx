@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Save, Database, Download, Upload, Shield, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Settings as SettingsIcon, Save, Database, Download, Upload, Shield, CheckCircle, AlertTriangle, Wifi, Monitor, Smartphone, Tablet } from 'lucide-react';
 import DatabaseService from '../services/database';
 import licenseService from '../services/licenseService';
 
@@ -414,6 +414,82 @@ function Settings() {
               />
             </label>
           </div>
+        </div>
+      </div>
+
+      {/* Network Access - Multi-Device Setup */}
+      <div className="card border-l-4 border-blue-500">
+        <h2 className="text-xl font-bold mb-4 flex items-center space-x-2">
+          <Wifi className="w-6 h-6 text-blue-600" />
+          <span>Multi-Device Network Access</span>
+        </h2>
+        <p className="text-gray-600 mb-4 text-sm">
+          NexaCare Pro is running on your hospital server. Other devices on the same hospital Wi-Fi network
+          can access it directly in their browser — no installation needed.
+        </p>
+
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+          <p className="font-semibold text-blue-800 mb-2">How to Connect Other Devices:</p>
+          <ol className="text-sm text-blue-700 space-y-2 list-decimal list-inside">
+            <li>Find your server's local IP address:
+              <span className="block ml-6 mt-1 font-mono bg-white border border-blue-200 rounded px-2 py-1 text-blue-900">
+                On the server PC → Open Command Prompt → type: <strong>ipconfig</strong> → note the IPv4 Address (e.g. 192.168.1.10)
+              </span>
+            </li>
+            <li className="mt-2">On any device connected to hospital Wi-Fi, open a browser and go to:
+              <span className="block ml-6 mt-1 font-mono bg-white border border-blue-200 rounded px-2 py-1 text-blue-900">
+                <strong>http://192.168.1.10:3000</strong> (replace with your server's IP)
+              </span>
+            </li>
+            <li className="mt-2">Login with the assigned username and password</li>
+          </ol>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
+            <Monitor className="w-8 h-8 text-blue-600 flex-shrink-0" />
+            <div>
+              <p className="font-semibold text-gray-800">Desktop PCs</p>
+              <p className="text-xs text-gray-600 mt-1">Open Chrome/Edge/Firefox → type server IP:3000</p>
+            </div>
+          </div>
+          <div className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
+            <Tablet className="w-8 h-8 text-green-600 flex-shrink-0" />
+            <div>
+              <p className="font-semibold text-gray-800">Doctor's Mac / iPad</p>
+              <p className="text-xs text-gray-600 mt-1">Open Safari/Chrome → type server IP:3000. Install as PWA for app experience.</p>
+            </div>
+          </div>
+          <div className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
+            <Smartphone className="w-8 h-8 text-purple-600 flex-shrink-0" />
+            <div>
+              <p className="font-semibold text-gray-800">Mobile Phones</p>
+              <p className="text-xs text-gray-600 mt-1">Open Chrome → type server IP:3000 → tap "Add to Home Screen" for app icon.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-3 text-sm">
+          <p className="font-semibold text-yellow-800 flex items-center space-x-2">
+            <AlertTriangle className="w-4 h-4" />
+            <span>Important — Data Sharing Note:</span>
+          </p>
+          <p className="text-yellow-700 mt-1">
+            Each device stores data locally in its own browser. To share data between all devices,
+            configure the <strong>Doc On API</strong> above (for cloud sync) so all devices stay in sync.
+            Alternatively, always use the <strong>same device/browser</strong> for data entry, and other
+            devices for read-only viewing after syncing.
+          </p>
+        </div>
+
+        <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-3 text-sm">
+          <p className="font-semibold text-green-800">Installing as App (PWA) on Doctor's Mac/iPad:</p>
+          <ol className="text-green-700 mt-1 list-decimal list-inside space-y-1">
+            <li>Open the app URL in Safari (Mac/iPad) or Chrome (Android)</li>
+            <li>Click the Share button → "Add to Home Screen" (iOS/iPadOS)</li>
+            <li>Or in Chrome: click the install icon in the address bar (⊕)</li>
+            <li>The app opens in full-screen, works offline after first load</li>
+          </ol>
         </div>
       </div>
 

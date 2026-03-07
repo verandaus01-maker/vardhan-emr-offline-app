@@ -1,31 +1,35 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, Plus, Search, User, Phone, X, CheckCircle } from 'lucide-react';
+import { Calendar, Clock, Plus, Search, User, Phone, X, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import DatabaseService from '../services/database';
-import { format, startOfToday, addDays } from 'date-fns';
+import DatabaseService, { db } from '../services/database';
+import { format, startOfToday, addDays, subDays, parseISO } from 'date-fns';
 
 function Appointments() {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(format(startOfToday(), 'yyyy-MM-dd'));
   const navigate = useNavigate();
 
   useEffect(() => {
     loadAppointments();
-  }, []);
+  }, [selectedDate]);
 
   const loadAppointments = async () => {
+    setLoading(true);
     try {
-      const today = format(startOfToday(), 'yyyy-MM-dd');
-      const todayAppointments = await DatabaseService.db.appointments
+      const dateStart = selectedDate;
+      const dateEnd = selectedDate + 'Z';
+
+      const dayAppointments = await db.appointments
         .where('date')
-        .between(today, today + 'Z')
-        .sortBy('createdAt');
+        .between(dateStart, dateEnd)
+        .sortBy('time');
 
       // Enrich with patient details
       const enriched = await Promise.all(
-        todayAppointments.map(async (apt) => {
-          const patient = await DatabaseService.db.patients.get(apt.patientId);
+        dayAppointments.map(async (apt) => {
+          const patient = await db.patients.get(apt.patientId);
           return {
             ...apt,
             patientName: patient?.name || 'Unknown',
@@ -42,24 +46,51 @@ function Appointments() {
     }
   };
 
-  const handleNewAppointment = () => {
-    setShowModal(true);
+  const handleUpdateStatus = async (aptId, newStatus) => {
+    try {
+      await DatabaseService.updateAppointmentStatus(aptId, newStatus);
+      loadAppointments();
+    } catch (error) {
+      console.error('Failed to update status:', error);
+      alert('Failed to update appointment status');
+    }
   };
 
-  const handleAppointmentCreated = () => {
-    setShowModal(false);
-    loadAppointments();
+  const goToPrevDay = () => {
+    const prev = format(subDays(parseISO(selectedDate), 1), 'yyyy-MM-dd');
+    setSelectedDate(prev);
+  };
+
+  const goToNextDay = () => {
+    const next = format(addDays(parseISO(selectedDate), 1), 'yyyy-MM-dd');
+    setSelectedDate(next);
+  };
+
+  const goToToday = () => {
+    setSelectedDate(format(startOfToday(), 'yyyy-MM-dd'));
+  };
+
+  const isToday = selectedDate === format(startOfToday(), 'yyyy-MM-dd');
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'completed': return 'bg-green-100 text-green-800';
+      case 'in-progress': return 'bg-blue-100 text-blue-800';
+      case 'cancelled': return 'bg-red-100 text-red-800';
+      default: return 'bg-yellow-100 text-yellow-800';
+    }
   };
 
   return (
     <div className="space-y-6 fade-in">
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <h1 className="text-3xl font-bold text-gray-800 flex items-center space-x-3">
           <Calendar className="w-8 h-8 text-purple-600" />
           <span>Appointments</span>
         </h1>
         <button
-          onClick={handleNewAppointment}
+          onClick={() => setShowModal(true)}
           className="btn-primary flex items-center space-x-2"
         >
           <Plus className="w-5 h-5" />
@@ -67,8 +98,60 @@ function Appointments() {
         </button>
       </div>
 
+      {/* Date Navigator */}
       <div className="card">
-        <h2 className="text-xl font-bold mb-4">Today's Schedule</h2>
+        <div className="flex items-center justify-between">
+          <button
+            onClick={goToPrevDay}
+            className="p-2 hover:bg-gray-100 rounded-lg transition"
+          >
+            <ChevronLeft className="w-6 h-6 text-gray-600" />
+          </button>
+
+          <div className="text-center">
+            <div className="flex items-center space-x-3">
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="border-2 border-gray-300 rounded-lg px-3 py-2 focus:border-purple-500 focus:outline-none text-lg font-semibold"
+              />
+              {!isToday && (
+                <button
+                  onClick={goToToday}
+                  className="px-3 py-2 bg-purple-100 text-purple-700 rounded-lg text-sm font-semibold hover:bg-purple-200 transition"
+                >
+                  Today
+                </button>
+              )}
+            </div>
+            <p className="text-gray-500 text-sm mt-1">
+              {format(parseISO(selectedDate), 'EEEE, MMMM d, yyyy')}
+              {isToday && (
+                <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-semibold">
+                  Today
+                </span>
+              )}
+            </p>
+          </div>
+
+          <button
+            onClick={goToNextDay}
+            className="p-2 hover:bg-gray-100 rounded-lg transition"
+          >
+            <ChevronRight className="w-6 h-6 text-gray-600" />
+          </button>
+        </div>
+      </div>
+
+      {/* Appointments List */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold">
+            {appointments.length} Appointment{appointments.length !== 1 ? 's' : ''}
+          </h2>
+        </div>
+
         {loading ? (
           <div className="flex justify-center py-12">
             <div className="spinner"></div>
@@ -78,33 +161,68 @@ function Appointments() {
             {appointments.map(apt => (
               <div
                 key={apt.id}
-                className="border-l-4 border-purple-500 bg-purple-50 p-4 rounded-lg cursor-pointer hover:shadow-md transition"
-                onClick={() => navigate(`/patients/${apt.patientId}`)}
+                className="border border-gray-200 rounded-xl p-4 hover:shadow-md transition bg-white"
               >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-bold text-gray-800">{apt.patientName}</p>
-                    <p className="text-sm text-gray-600 flex items-center space-x-2 mt-1">
-                      <Clock className="w-4 h-4" />
-                      <span>{apt.time}</span>
+                <div className="flex items-start justify-between flex-wrap gap-3">
+                  <div
+                    className="flex-1 cursor-pointer"
+                    onClick={() => navigate(`/patients/${apt.patientId}`)}
+                  >
+                    <p className="font-bold text-gray-800 text-lg">{apt.patientName}</p>
+                    <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600 mt-1">
+                      {apt.time && (
+                        <span className="flex items-center space-x-1">
+                          <Clock className="w-4 h-4" />
+                          <span>{apt.time}</span>
+                        </span>
+                      )}
+                      {apt.type && (
+                        <span className="px-2 py-0.5 bg-gray-100 rounded text-xs font-semibold">
+                          {apt.type}
+                        </span>
+                      )}
                       {apt.patientPhone && (
-                        <>
-                          <span>•</span>
+                        <span className="flex items-center space-x-1">
                           <Phone className="w-4 h-4" />
                           <span>{apt.patientPhone}</span>
-                        </>
+                        </span>
                       )}
-                    </p>
+                    </div>
+                    {apt.notes && (
+                      <p className="text-sm text-gray-500 mt-2 italic">"{apt.notes}"</p>
+                    )}
                   </div>
-                  <span className={`
-                    px-3 py-1 rounded-full text-sm font-semibold
-                    ${apt.status === 'completed' ? 'bg-green-100 text-green-800' :
-                      apt.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
-                      apt.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                      'bg-yellow-100 text-yellow-800'}
-                  `}>
-                    {apt.status}
-                  </span>
+
+                  <div className="flex items-center space-x-2 flex-wrap gap-2">
+                    <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(apt.status)}`}>
+                      {apt.status}
+                    </span>
+
+                    {apt.status === 'scheduled' && (
+                      <div className="flex space-x-1">
+                        <button
+                          onClick={() => handleUpdateStatus(apt.id, 'in-progress')}
+                          className="px-3 py-1 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition"
+                        >
+                          Start
+                        </button>
+                        <button
+                          onClick={() => handleUpdateStatus(apt.id, 'cancelled')}
+                          className="px-3 py-1 bg-red-100 text-red-700 rounded-lg text-sm font-semibold hover:bg-red-200 transition"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
+                    {apt.status === 'in-progress' && (
+                      <button
+                        onClick={() => handleUpdateStatus(apt.id, 'completed')}
+                        className="px-3 py-1 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition"
+                      >
+                        Complete
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -112,13 +230,13 @@ function Appointments() {
         ) : (
           <div className="text-center py-12 text-gray-500">
             <Calendar className="w-16 h-16 mx-auto mb-3 text-gray-300" />
-            <p>No appointments for today</p>
+            <p className="text-lg">No appointments for this day</p>
             <button
-              onClick={handleNewAppointment}
+              onClick={() => setShowModal(true)}
               className="btn-primary mt-4"
             >
               <Plus className="w-5 h-5 inline mr-2" />
-              Create First Appointment
+              Book Appointment
             </button>
           </div>
         )}
@@ -126,8 +244,12 @@ function Appointments() {
 
       {showModal && (
         <AppointmentModal
+          defaultDate={selectedDate}
           onClose={() => setShowModal(false)}
-          onSuccess={handleAppointmentCreated}
+          onSuccess={() => {
+            setShowModal(false);
+            loadAppointments();
+          }}
         />
       )}
     </div>
@@ -135,8 +257,8 @@ function Appointments() {
 }
 
 // Appointment Creation Modal
-function AppointmentModal({ onClose, onSuccess }) {
-  const [step, setStep] = useState(1); // 1: Search Patient, 2: Appointment Details
+function AppointmentModal({ defaultDate, onClose, onSuccess }) {
+  const [step, setStep] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState(null);
@@ -144,7 +266,7 @@ function AppointmentModal({ onClose, onSuccess }) {
   const [saving, setSaving] = useState(false);
 
   const [appointmentData, setAppointmentData] = useState({
-    date: format(new Date(), 'yyyy-MM-dd'),
+    date: defaultDate || format(new Date(), 'yyyy-MM-dd'),
     time: format(new Date(), 'HH:mm'),
     type: 'Consultation',
     notes: ''
@@ -158,7 +280,6 @@ function AppointmentModal({ onClose, onSuccess }) {
         setSearchResults([]);
       }
     }, 300);
-
     return () => clearTimeout(delaySearch);
   }, [searchQuery]);
 
@@ -173,15 +294,9 @@ function AppointmentModal({ onClose, onSuccess }) {
     setSearching(false);
   };
 
-  const selectPatient = (patient) => {
-    setSelectedPatient(patient);
-    setStep(2);
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
-
     try {
       const appointment = {
         patientId: selectedPatient.id,
@@ -195,8 +310,7 @@ function AppointmentModal({ onClose, onSuccess }) {
         createdAt: new Date().toISOString(),
         syncStatus: 'pending'
       };
-
-      await DatabaseService.db.appointments.add(appointment);
+      await db.appointments.add(appointment);
       onSuccess();
     } catch (error) {
       console.error('Failed to create appointment:', error);
@@ -212,7 +326,7 @@ function AppointmentModal({ onClose, onSuccess }) {
           <h2 className="text-2xl font-bold text-gray-800">
             {step === 1 ? 'Select Patient' : 'Appointment Details'}
           </h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-3xl">
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -241,7 +355,7 @@ function AppointmentModal({ onClose, onSuccess }) {
                 {searchResults.map(patient => (
                   <div
                     key={patient.id}
-                    onClick={() => selectPatient(patient)}
+                    onClick={() => { setSelectedPatient(patient); setStep(2); }}
                     className="p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-md cursor-pointer transition"
                   >
                     <div className="flex items-center space-x-3">
@@ -304,7 +418,6 @@ function AppointmentModal({ onClose, onSuccess }) {
                   required
                 />
               </div>
-
               <div>
                 <label className="label">Time *</label>
                 <input
@@ -345,18 +458,10 @@ function AppointmentModal({ onClose, onSuccess }) {
             </div>
 
             <div className="flex items-center space-x-4 pt-4 border-t">
-              <button
-                type="submit"
-                disabled={saving}
-                className="btn-primary flex-1"
-              >
+              <button type="submit" disabled={saving} className="btn-primary flex-1">
                 {saving ? 'Creating Appointment...' : 'Create Appointment'}
               </button>
-              <button
-                type="button"
-                onClick={onClose}
-                className="btn-secondary"
-              >
+              <button type="button" onClick={onClose} className="btn-secondary">
                 Cancel
               </button>
             </div>
