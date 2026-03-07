@@ -57,7 +57,9 @@ function Settings() {
     setLoading(false);
   };
 
-  const SYNC_SERVER = 'http://1.22.20.11:3001';
+  // Dynamic — automatically points to the server running on this PC
+  // e.g. if app is opened at http://192.168.1.131:3000, server resolves to http://192.168.1.131:3001
+  const SYNC_SERVER = `${window.location.protocol}//${window.location.hostname}:3001`;
 
   const checkServerStatus = async () => {
     const url = SYNC_SERVER;
@@ -585,12 +587,13 @@ function Settings() {
         <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4 text-sm">
           <p className="font-semibold text-green-800 mb-2">One-time setup to share data & logins across all devices:</p>
           <ol className="text-green-700 space-y-1 list-decimal list-inside">
-            <li>On the hospital server PC (IP: <code className="bg-white border border-green-300 rounded px-1">1.22.20.11</code>), open Command Prompt in the app folder</li>
+            <li>On the <strong>main hospital PC</strong> (IP: <code className="bg-white border border-green-300 rounded px-1">192.168.1.131</code>), open Command Prompt in the app folder</li>
             <li>Run: <code className="bg-white border border-green-300 rounded px-1">node server.cjs</code> — leave this window open</li>
-            <li>Server listens on <code className="bg-white border border-green-300 rounded px-1">http://1.22.20.11:3001</code> — all devices connect here automatically</li>
+            <li>Server listens on <code className="bg-white border border-green-300 rounded px-1">http://192.168.1.131:3001</code> — all devices auto-connect here</li>
+            <li>On other PCs/tablets, open <code className="bg-white border border-green-300 rounded px-1">http://192.168.1.131:3000</code> in the browser</li>
             <li>Click <strong>Test Server Connection</strong> below to confirm it is running</li>
             <li>From the <strong>main PC</strong>: click <strong>Push All Data to Server</strong> — uploads all records</li>
-            <li>From each <strong>doctor/nurse PC</strong>: login, then click <strong>Pull All Data from Server</strong></li>
+            <li>From each <strong>doctor/nurse PC</strong>: login first, then click <strong>Pull All Data from Server</strong></li>
             <li>If users created offline can't login elsewhere: click <strong>Sync Users to Server</strong></li>
           </ol>
         </div>
