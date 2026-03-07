@@ -6,20 +6,20 @@ import bcrypt from 'bcryptjs';
  * Manages user login, roles, and permissions
  */
 
+// Central sync server — dedicated hospital server IP, always reachable on LAN
+const CENTRAL_SERVER = 'http://1.22.20.11:3001';
+
 class AuthService {
   constructor() {
     this.currentUser = null;
     this.isAuthenticated = false;
-    this.serverUrl = null; // Set from settings (docOnApiUrl)
+    this.serverUrl = CENTRAL_SERVER;
   }
 
   /**
-   * Get the central sync server URL from settings
+   * Get the central sync server URL
    */
   async getServerUrl() {
-    if (this.serverUrl) return this.serverUrl;
-    const url = await DatabaseService.getSetting('docOnApiUrl');
-    this.serverUrl = url || null;
     return this.serverUrl;
   }
 
@@ -44,23 +44,30 @@ class AuthService {
   }
 
   /**
-   * Sync users from central server to local IndexedDB so all device logins work offline
+   * Sync users from central server to local IndexedDB so all device logins work offline.
+   * The server returns hashed passwords so local bcrypt compare still works.
    */
   async syncUsersFromServer() {
     const serverUrl = await this.getServerUrl();
     if (!serverUrl) return;
     try {
-      const res = await fetch(`${serverUrl}/api/auth/users`, { signal: AbortSignal.timeout(4000) });
+      const res = await fetch(`${serverUrl}/api/auth/users`, { signal: AbortSignal.timeout(5000) });
       if (!res.ok) return;
       const serverUsers = await res.json();
       for (const u of serverUsers) {
         const existing = await db.users.where('username').equalsIgnoreCase(u.username).first();
         if (!existing) {
-          // Add server user locally with a dummy hashed password marker
-          // The real auth will go to server; local is for offline fallback
           await db.users.add({
             ...u,
-            password: u.password || await bcrypt.hash('__server_auth__', 4),
+            isActive: u.isActive === 1 || u.isActive === true,
+          });
+        } else {
+          // Update local copy with server data (keeps password in sync)
+          await db.users.update(existing.id, {
+            password: u.password,
+            name: u.name,
+            role: u.role,
+            permissions: u.permissions,
             isActive: u.isActive === 1 || u.isActive === true,
           });
         }
@@ -103,7 +110,7 @@ class AuthService {
   async createDefaultAdmin() {
     const defaultAdmin = {
       username: 'admin',
-      password: await bcrypt.hash('vardhan@2025', 10),
+      password: await bcrypt.hash('Vardhan@Hospital12*', 10),
       name: 'System Administrator',
       email: 'admin@vardhanhospital.co.in',
       role: 'admin',
@@ -114,8 +121,7 @@ class AuthService {
     };
 
     await db.users.add(defaultAdmin);
-    console.log('Default admin user created (username: admin, password: vardhan@2025)');
-    console.log('⚠️ IMPORTANT: Please change the default password immediately!');
+    console.log('Default admin user created (username: admin)');
   }
 
   /**
@@ -123,25 +129,26 @@ class AuthService {
    */
   async login(username, password) {
     try {
-      // ── Step 1: Try central server ──────────────────────────────────────
+      // ── Step 1: Try central server first ───────────────────────────────
       const serverResult = await this.loginWithServer(username, password);
       if (serverResult?.success) {
         const serverUser = serverResult.user;
         this.currentUser = { ...serverUser, _authSource: 'server' };
         this.isAuthenticated = true;
         localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
-
-        // Sync server users to local in background
+        // Sync all server users to local DB so offline works
         this.syncUsersFromServer().catch(() => {});
-
         return { success: true, user: this.currentUser };
       }
       if (serverResult && !serverResult.success) {
-        // Server reachable but credentials wrong — don't fall through
+        // Server reachable but credentials wrong — definitive failure
         throw new Error(serverResult.error || 'Invalid username or password');
       }
 
-      // ── Step 2: Local IndexedDB (offline / server unreachable) ──────────
+      // ── Step 2: Server unreachable → sync users first then try local ───
+      // Attempt a quick user sync so newly added users are available offline
+      await this.syncUsersFromServer();
+
       const user = await db.users
         .where('username')
         .equalsIgnoreCase(username)
@@ -256,15 +263,14 @@ class AuthService {
     }
 
     try {
-      // Hash password
       const hashedPassword = await bcrypt.hash(userData.password, 10);
 
       const newUser = {
         username: userData.username,
         password: hashedPassword,
         name: userData.name,
-        email: userData.email,
-        phone: userData.phone,
+        email: userData.email || '',
+        phone: userData.phone || '',
         role: userData.role || 'staff',
         permissions: userData.permissions || this.getDefaultPermissions(userData.role),
         isActive: true,
@@ -273,7 +279,34 @@ class AuthService {
         lastLogin: null
       };
 
-      const userId = await db.users.add(newUser);
+      // ── Push to central server first (single source of truth) ──────────
+      const serverUrl = await this.getServerUrl();
+      let serverId = null;
+      try {
+        const res = await fetch(`${serverUrl}/api/auth/users`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...newUser, plainPassword: userData.password }),
+          signal: AbortSignal.timeout(5000)
+        });
+        if (res.ok) {
+          const data = await res.json();
+          serverId = data.id;
+        }
+      } catch {
+        // Server unreachable — save locally and it will sync when server is back
+      }
+
+      // ── Save locally so this device works offline too ───────────────────
+      const existing = await db.users.where('username').equalsIgnoreCase(userData.username).first();
+      let userId;
+      if (!existing) {
+        userId = await db.users.add({ ...newUser, serverId });
+      } else {
+        userId = existing.id;
+        await db.users.update(userId, { ...newUser, serverId });
+      }
+
       return { success: true, userId };
     } catch (error) {
       console.error('User creation failed:', error);

@@ -54,26 +54,26 @@ function Settings() {
     setLoading(false);
   };
 
+  const SYNC_SERVER = 'http://1.22.20.11:3001';
+
   const checkServerStatus = async () => {
-    const url = settings.docOnApiUrl;
-    if (!url) return setServerStatus({ ok: false, msg: 'Server URL not set above' });
+    const url = SYNC_SERVER;
     try {
-      const res = await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(3000) });
+      const res = await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(4000) });
       if (res.ok) {
-        const data = await res.json();
         const stats = await fetch(`${url}/api/stats`).then(r => r.json()).catch(() => ({}));
-        setServerStatus({ ok: true, msg: `✅ Connected — ${stats.patients || 0} patients, ${stats.prescriptions || 0} prescriptions on server` });
+        setServerStatus({ ok: true, msg: `✅ Connected to ${url} — ${stats.patients || 0} patients, ${stats.prescriptions || 0} prescriptions on server` });
       } else {
         setServerStatus({ ok: false, msg: `❌ Server returned ${res.status}` });
       }
     } catch {
-      setServerStatus({ ok: false, msg: '❌ Cannot reach server. Make sure node server.cjs is running.' });
+      setServerStatus({ ok: false, msg: `❌ Cannot reach ${url}. Make sure node server.cjs is running on the hospital server.` });
     }
   };
 
   const handlePushToServer = async () => {
-    const url = settings.docOnApiUrl;
-    if (!url) return alert('Please set and save the Sync Server URL (Doc On API URL field) first.');
+    const url = SYNC_SERVER;
+    if (!confirm('Push ALL local data (patients, prescriptions, vitals) to the central server?\n\nThis is safe — existing data on the server is preserved.')) return;
     if (!confirm('Push ALL local data (patients, prescriptions, vitals) to the central server?\n\nThis is safe — existing data on the server is preserved.')) return;
 
     setPushing(true);
@@ -494,8 +494,8 @@ function Settings() {
           <ol className="text-green-700 space-y-1 list-decimal list-inside">
             <li>On the hospital server PC, open Command Prompt in the app folder</li>
             <li>Run: <code className="bg-white border border-green-300 rounded px-1">node server.cjs</code> — leave this window open</li>
-            <li>Set the <strong>Doc On API URL</strong> field above to: <code className="bg-white border border-green-300 rounded px-1">http://192.168.1.131:3001</code></li>
-            <li>Click <strong>Save Settings</strong> below</li>
+            <li>Server is pre-configured to listen on <code className="bg-white border border-green-300 rounded px-1">http://1.22.20.11:3001</code> — no URL setup needed</li>
+            <li>Click <strong>Test Server Connection</strong> below to confirm it is running</li>
             <li>Click <strong>Push All Data to Server</strong> (below) — uploads your 71,000+ records</li>
             <li>All other devices will now login and sync through the server automatically</li>
           </ol>

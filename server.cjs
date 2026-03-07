@@ -139,14 +139,28 @@ db.exec(`
 // Create default admin if no users exist
 const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get().c;
 if (userCount === 0) {
-  const hash = bcrypt.hashSync('vardhan@2025', 10);
+  const hash = bcrypt.hashSync('Vardhan@Hospital12*', 10);
   db.prepare(`
     INSERT INTO users (username, password, name, email, role, permissions, isActive, createdAt)
     VALUES (?, ?, ?, ?, ?, ?, 1, ?)
   `).run('admin', hash, 'System Administrator', 'admin@vardhanhospital.co.in',
     'admin', JSON.stringify(['all']), new Date().toISOString());
-  console.log('✅ Default admin created: admin / vardhan@2025');
+  console.log('✅ Default admin created: admin / Vardhan@Hospital12*');
 }
+
+// If admin exists with old password vardhan@2025, update it to the real hospital password
+// (Run once on upgrade — safe because we check first)
+try {
+  const adminUser = db.prepare("SELECT * FROM users WHERE username='admin'").get();
+  if (adminUser) {
+    const hasOldPass = bcrypt.compareSync('vardhan@2025', adminUser.password);
+    if (hasOldPass) {
+      const newHash = bcrypt.hashSync('Vardhan@Hospital12*', 10);
+      db.prepare("UPDATE users SET password=? WHERE username='admin'").run(newHash);
+      console.log('✅ Admin password updated from default to hospital password');
+    }
+  }
+} catch (e) { /* ignore */ }
 
 // ─── Middleware ──────────────────────────────────────────────────────────────
 app.use(cors({ origin: '*', credentials: true }));
@@ -193,29 +207,35 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Get all users
+// Get all users — includes hashed password so devices can do local bcrypt verify offline
 app.get('/api/auth/users', (req, res) => {
-  const users = db.prepare('SELECT id, username, name, email, phone, role, permissions, isActive, createdAt, lastLogin FROM users').all();
+  const users = db.prepare('SELECT id, username, password, name, email, phone, role, permissions, isActive, createdAt, lastLogin FROM users').all();
   const result = users.map(u => ({ ...u, permissions: JSON.parse(u.permissions || '[]') }));
   res.json(result);
 });
 
 // Create user
+// Accepts: plainPassword (plain text, we hash it) OR password (already hashed from client)
 app.post('/api/auth/users', async (req, res) => {
   try {
-    const { username, password, name, email, phone, role, permissions } = req.body;
-    const hash = await bcrypt.hash(password, 10);
+    const { username, plainPassword, password, name, email, phone, role, permissions } = req.body;
+    // Use plainPassword if provided (new user creation), else use pre-hashed password
+    const rawPass = plainPassword || password;
+    if (!rawPass) return res.status(400).json({ success: false, error: 'Password required' });
+    // If it's already a bcrypt hash (starts with $2), use as-is; otherwise hash it
+    const hash = rawPass.startsWith('$2') ? rawPass : await bcrypt.hash(rawPass, 10);
     const perms = JSON.stringify(permissions || []);
     const now = new Date().toISOString();
-    db.prepare(`
+    const result = db.prepare(`
       INSERT INTO users (username, password, name, email, phone, role, permissions, isActive, createdAt)
       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
-    `).run(username, hash, name, email || '', phone || '', role || 'staff', perms, now);
-    res.json({ success: true });
+      ON CONFLICT(username) DO UPDATE SET
+        password=excluded.password, name=excluded.name, email=excluded.email,
+        phone=excluded.phone, role=excluded.role, permissions=excluded.permissions,
+        updatedAt=?
+    `).run(username, hash, name, email || '', phone || '', role || 'staff', perms, now, now);
+    res.json({ success: true, id: result.lastInsertRowid });
   } catch (err) {
-    if (err.message.includes('UNIQUE')) {
-      return res.status(409).json({ success: false, error: 'Username already exists' });
-    }
     res.status(500).json({ success: false, error: err.message });
   }
 });

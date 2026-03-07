@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, LogIn, Lock, User } from 'lucide-react';
+import { Activity, LogIn, Lock, User, Wifi, Shield } from 'lucide-react';
 import authService from '../services/authService';
 
 function Login({ onLoginSuccess }) {
@@ -14,18 +14,16 @@ function Login({ onLoginSuccess }) {
     e.preventDefault();
     setError('');
     setLoading(true);
-
     try {
-      const result = await authService.login(username, password);
-
+      const result = await authService.login(username.trim(), password);
       if (result.success) {
         onLoginSuccess(result.user);
         navigate('/');
       } else {
-        setError(result.error || 'Login failed');
+        setError(result.error || 'Invalid username or password');
       }
     } catch (err) {
-      setError('An error occurred during login');
+      setError('An error occurred during login. Please try again.');
       console.error('Login error:', err);
     } finally {
       setLoading(false);
@@ -33,61 +31,93 @@ function Login({ onLoginSuccess }) {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-600 via-blue-700 to-blue-900 flex items-center justify-center p-6">
-      <div className="max-w-md w-full">
-        {/* Logo and Branding */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-white rounded-full mb-4 shadow-2xl">
-            <Activity className="w-12 h-12 text-blue-600" />
-          </div>
-          <h1 className="text-4xl font-bold text-white mb-2">NexaCare Pro</h1>
-          <p className="text-blue-200 text-lg font-semibold">by NexaVoyagers Technologies</p>
-          <p className="text-blue-300 text-sm mt-2">Next-Generation Intelligent EMR System</p>
-          <div className="mt-3 inline-block px-4 py-1 bg-blue-500 bg-opacity-30 rounded-full">
-            <p className="text-xs text-white font-semibold">AI-Powered • Real-Time Sync • Patient Portal</p>
-          </div>
+    <div className="min-h-screen flex flex-col md:flex-row">
+      {/* Left panel — branding */}
+      <div className="hidden md:flex md:w-1/2 bg-gradient-to-br from-blue-700 via-blue-800 to-blue-950 flex-col items-center justify-center p-12 text-white">
+        <div className="w-24 h-24 bg-white bg-opacity-20 rounded-3xl flex items-center justify-center mb-6 shadow-2xl">
+          <Activity className="w-14 h-14 text-white" />
+        </div>
+        <h1 className="text-5xl font-extrabold mb-3 tracking-tight">NexaCare Pro</h1>
+        <p className="text-blue-200 text-xl font-medium mb-2">by NexaVoyagers Technologies</p>
+        <p className="text-blue-300 text-sm mb-10">AI-Powered Clinical EMR System</p>
+
+        <div className="w-full max-w-xs space-y-4">
+          {[
+            { icon: Wifi, label: 'Multi-Device Sync', desc: 'All hospital devices stay in sync' },
+            { icon: Shield, label: 'Role-Based Access', desc: 'Admin, Doctor, Nurse & more' },
+            { icon: Activity, label: 'Offline-First', desc: 'Works without internet' },
+          ].map(({ icon: Icon, label, desc }) => (
+            <div key={label} className="flex items-center space-x-3 bg-white bg-opacity-10 rounded-xl p-3">
+              <div className="w-9 h-9 bg-white bg-opacity-20 rounded-lg flex items-center justify-center flex-shrink-0">
+                <Icon className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <p className="font-semibold text-sm">{label}</p>
+                <p className="text-blue-300 text-xs">{desc}</p>
+              </div>
+            </div>
+          ))}
         </div>
 
-        {/* Login Card */}
-        <div className="bg-white rounded-2xl shadow-2xl p-8">
-          <div className="mb-6 text-center">
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Welcome Back</h2>
-            <p className="text-gray-600">Sign in to access your EMR system</p>
+        <div className="mt-12 text-center">
+          <p className="text-blue-300 text-xs">Licensed to: Vardhan Hospital, Varanasi</p>
+          <p className="text-blue-400 text-xs mt-1">© 2024-2025 NexaVoyagers Technologies Pvt. Ltd.</p>
+        </div>
+      </div>
+
+      {/* Right panel — login form */}
+      <div className="flex-1 flex flex-col items-center justify-center p-6 md:p-12 bg-gray-50">
+        {/* Mobile logo */}
+        <div className="md:hidden text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-2xl mb-3 shadow-lg">
+            <Activity className="w-9 h-9 text-white" />
+          </div>
+          <h1 className="text-3xl font-extrabold text-gray-900">NexaCare Pro</h1>
+          <p className="text-gray-500 text-sm mt-1">Vardhan Hospital EMR</p>
+        </div>
+
+        <div className="w-full max-w-md">
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold text-gray-900">Sign in</h2>
+            <p className="text-gray-500 mt-1">Enter your credentials to access the system</p>
           </div>
 
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-300 rounded-lg text-red-800 text-sm">
-              {error}
+            <div className="mb-5 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm flex items-start space-x-2">
+              <span className="text-red-500 mt-0.5 flex-shrink-0">⚠</span>
+              <span>{error}</span>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="label">Username</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Username</label>
               <div className="relative">
-                <User className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <User className="w-5 h-5 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="Enter your username"
-                  className="input pl-10"
+                  className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 placeholder-gray-400"
                   required
                   autoFocus
+                  autoCapitalize="none"
+                  autoCorrect="off"
                 />
               </div>
             </div>
 
             <div>
-              <label className="label">Password</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Password</label>
               <div className="relative">
-                <Lock className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Lock className="w-5 h-5 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
-                  className="input pl-10"
+                  className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 placeholder-gray-400"
                   required
                 />
               </div>
@@ -96,12 +126,15 @@ function Login({ onLoginSuccess }) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full btn-primary flex items-center justify-center space-x-2 py-3 text-lg"
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold py-3.5 rounded-xl transition shadow-md flex items-center justify-center space-x-2 text-base mt-2"
             >
               {loading ? (
                 <>
-                  <div className="spinner w-5 h-5"></div>
-                  <span>Signing in...</span>
+                  <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                  </svg>
+                  <span>Signing in…</span>
                 </>
               ) : (
                 <>
@@ -112,32 +145,9 @@ function Login({ onLoginSuccess }) {
             </button>
           </form>
 
-          {/* Default Credentials Info */}
-          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-blue-800 font-semibold mb-2">Default Login:</p>
-            <div className="text-sm text-blue-700 space-y-1">
-              <div>Username: <code className="bg-blue-100 px-2 py-1 rounded">admin</code></div>
-              <div>Password: <code className="bg-blue-100 px-2 py-1 rounded">vardhan@2025</code></div>
-            </div>
-            <p className="text-xs text-blue-600 mt-2">⚠️ Change password after first login</p>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="text-center mt-6 space-y-2">
-          <div className="bg-white bg-opacity-10 rounded-lg p-4">
-            <p className="text-white font-semibold">NexaCare Pro™ v1.0</p>
-            <p className="text-blue-200 text-sm mt-1">
-              © 2024-2025 NexaVoyagers Technologies Pvt. Ltd.
-            </p>
-            <p className="text-blue-300 text-xs mt-1">All Rights Reserved • Proprietary Software</p>
-            <div className="mt-3 pt-3 border-t border-blue-400 border-opacity-30">
-              <p className="text-xs text-blue-200">Licensed to: Vardhan Hospital, Varanasi</p>
-              <p className="text-xs text-blue-300 mt-1">
-                Unauthorized copying, distribution, or use is strictly prohibited
-              </p>
-            </div>
-          </div>
+          <p className="text-center text-gray-400 text-xs mt-8">
+            Contact your hospital administrator if you cannot sign in.
+          </p>
         </div>
       </div>
     </div>

@@ -140,14 +140,26 @@ function PatientDetails() {
     return [];
   };
 
+  // When printingPrescription is set, add class → wait for render → print → cleanup
+  useEffect(() => {
+    if (!printingPrescription) return;
+    document.body.classList.add('rx-print-mode');
+    // Give React one full render cycle (requestAnimationFrame) then print
+    const raf = requestAnimationFrame(() => {
+      setTimeout(() => {
+        window.print();
+        document.body.classList.remove('rx-print-mode');
+        setPrintingPrescription(null);
+      }, 150); // small delay for browser to paint
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      document.body.classList.remove('rx-print-mode');
+    };
+  }, [printingPrescription]);
+
   const handlePrintPrescription = (prescription) => {
     setPrintingPrescription(prescription);
-    document.body.classList.add('rx-print-mode');
-    setTimeout(() => {
-      window.print();
-      document.body.classList.remove('rx-print-mode');
-      setPrintingPrescription(null);
-    }, 400);
   };
 
   if (loading) {
