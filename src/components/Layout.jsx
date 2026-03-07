@@ -19,6 +19,7 @@ function Layout({ currentUser, onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [installPrompt, setInstallPrompt] = useState(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [showInstallInstructions, setShowInstallInstructions] = useState(false);
 
   useEffect(() => {
     // Capture PWA install prompt
@@ -45,21 +46,17 @@ function Layout({ currentUser, onLogout }) {
 
   const handleInstallApp = async () => {
     if (installPrompt) {
+      // Chrome/Android — native install prompt
       installPrompt.prompt();
       const { outcome } = await installPrompt.userChoice;
       if (outcome === 'accepted') {
         setInstallPrompt(null);
         setShowInstallBanner(false);
+        localStorage.setItem('pwaInstallDismissed', '1');
       }
     } else {
-      // Show manual instructions
-      alert(
-        'To install NexaCare Pro:\n\n' +
-        '📱 iPhone/iPad (Safari):\n  Tap Share → "Add to Home Screen"\n\n' +
-        '🤖 Android (Chrome):\n  Tap Menu (⋮) → "Add to Home Screen"\n\n' +
-        '💻 Desktop (Chrome/Edge):\n  Click the install icon (⊕) in the address bar\n\n' +
-        'This gives you offline access and a native app experience!'
-      );
+      // iOS Safari / other browsers — show manual steps
+      setShowInstallInstructions(true);
     }
   };
 
@@ -364,6 +361,83 @@ function Layout({ currentUser, onLogout }) {
             >
               <X className="w-4 h-4" />
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add to Home Screen Instructions Modal */}
+      {showInstallInstructions && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-[100] flex items-end sm:items-center justify-center p-4 no-print">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-600 to-blue-800 p-5 text-white">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-white bg-opacity-20 rounded-xl flex items-center justify-center">
+                    <Smartphone className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-lg">Add to Home Screen</p>
+                    <p className="text-blue-200 text-xs">Install NexaCare Pro as an app</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowInstallInstructions(false)} className="p-1.5 hover:bg-white hover:bg-opacity-20 rounded-lg transition">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <div className="p-5 space-y-4">
+              {/* iOS */}
+              <div className="border border-gray-200 rounded-xl p-4">
+                <p className="font-bold text-gray-800 mb-2 flex items-center space-x-2">
+                  <span className="text-xl">🍎</span>
+                  <span>iPhone / iPad (Safari)</span>
+                </p>
+                <ol className="text-sm text-gray-600 space-y-1.5 list-decimal list-inside">
+                  <li>Open <strong>Safari</strong> browser (not Chrome)</li>
+                  <li>Tap the <strong>Share</strong> button (box with arrow ↑) at the bottom</li>
+                  <li>Scroll down and tap <strong>"Add to Home Screen"</strong></li>
+                  <li>Tap <strong>Add</strong> — app icon appears on your Home Screen</li>
+                </ol>
+              </div>
+              {/* Android */}
+              <div className="border border-gray-200 rounded-xl p-4">
+                <p className="font-bold text-gray-800 mb-2 flex items-center space-x-2">
+                  <span className="text-xl">🤖</span>
+                  <span>Android (Chrome)</span>
+                </p>
+                <ol className="text-sm text-gray-600 space-y-1.5 list-decimal list-inside">
+                  <li>Tap the <strong>Menu (⋮)</strong> in top-right corner</li>
+                  <li>Tap <strong>"Add to Home screen"</strong></li>
+                  <li>Tap <strong>Add</strong> to confirm</li>
+                </ol>
+              </div>
+              {/* Desktop */}
+              <div className="border border-gray-200 rounded-xl p-4">
+                <p className="font-bold text-gray-800 mb-2 flex items-center space-x-2">
+                  <span className="text-xl">💻</span>
+                  <span>Desktop (Chrome / Edge)</span>
+                </p>
+                <ol className="text-sm text-gray-600 space-y-1.5 list-decimal list-inside">
+                  <li>Look for the <strong>install icon (⊕)</strong> in the address bar</li>
+                  <li>Click it and choose <strong>Install</strong></li>
+                </ol>
+              </div>
+              <p className="text-xs text-gray-400 text-center">
+                The app works offline after installation. Data syncs when connected to the hospital network.
+              </p>
+            </div>
+            <div className="px-5 pb-5">
+              <button
+                onClick={() => {
+                  setShowInstallInstructions(false);
+                  setShowInstallBanner(false);
+                  localStorage.setItem('pwaInstallDismissed', '1');
+                }}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition"
+              >
+                Got it!
+              </button>
+            </div>
           </div>
         </div>
       )}

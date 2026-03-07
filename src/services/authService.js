@@ -6,20 +6,21 @@ import bcrypt from 'bcryptjs';
  * Manages user login, roles, and permissions
  */
 
+// Central sync server — static hospital IP, always reachable on the hospital LAN.
+// Doctors access the app from any IP but the sync server is always at this fixed address.
+const CENTRAL_SERVER = 'http://1.22.20.11:3001';
+
 class AuthService {
   constructor() {
     this.currentUser = null;
     this.isAuthenticated = false;
-    this.serverUrl = null; // Set from settings (docOnApiUrl)
+    this.serverUrl = CENTRAL_SERVER;
   }
 
   /**
-   * Get the central sync server URL from settings
+   * Get the central sync server URL
    */
   async getServerUrl() {
-    if (this.serverUrl) return this.serverUrl;
-    const url = await DatabaseService.getSetting('docOnApiUrl');
-    this.serverUrl = url || null;
     return this.serverUrl;
   }
 
@@ -44,23 +45,121 @@ class AuthService {
   }
 
   /**
-   * Sync users from central server to local IndexedDB so all device logins work offline
+   * Push any locally-created users (created when server was offline) to the central server.
+   * Safe to call repeatedly — server uses ON CONFLICT(username) DO UPDATE.
+   */
+  async syncPendingUsersToServer() {
+    try {
+      const localUsers = await db.users.toArray();
+      // Users without a serverId were created while the server was offline
+      const pending = localUsers.filter(u => !u.serverId);
+      if (pending.length === 0) return { pushed: 0 };
+      let pushed = 0;
+      for (const u of pending) {
+        try {
+          const res = await fetch(`${CENTRAL_SERVER}/api/auth/users`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...u, password: u.password }), // already hashed
+            signal: AbortSignal.timeout(5000)
+          });
+          if (res.ok) {
+            const data = await res.json();
+            await db.users.update(u.id, { serverId: data.id });
+            pushed++;
+          }
+        } catch { /* skip individual failures */ }
+      }
+      return { pushed };
+    } catch {
+      return { pushed: 0 };
+    }
+  }
+
+  /**
+   * Pull ALL patient/prescription/vital data from the central server into local IndexedDB.
+   * Called automatically after login when local DB is empty (fresh device).
+   * Progress callback: fn(msg, pct)
+   */
+  async pullDataFromServer(onProgress) {
+    const report = (msg, pct) => { try { onProgress && onProgress(msg, pct); } catch {} };
+    try {
+      // ── Patients ──────────────────────────────────────────────────────────
+      report('Downloading patients from server...', 5);
+      let page = 1;
+      let totalPatients = 0;
+      while (true) {
+        const res = await fetch(`${CENTRAL_SERVER}/api/patients?page=${page}&limit=500`, { signal: AbortSignal.timeout(30000) });
+        if (!res.ok) break;
+        const { patients } = await res.json();
+        if (!patients || patients.length === 0) break;
+        for (const p of patients) {
+          const existing = await db.patients.where('uhid').equals(p.uhid || '').first();
+          if (!existing) {
+            await db.patients.add({ ...p, id: undefined, syncStatus: 'synced' });
+          }
+        }
+        totalPatients += patients.length;
+        report(`Downloaded ${totalPatients} patients...`, Math.min(5 + Math.round(totalPatients / 200), 50));
+        if (patients.length < 500) break;
+        page++;
+      }
+
+      // ── Prescriptions ─────────────────────────────────────────────────────
+      report('Downloading prescriptions...', 55);
+      const rxRes = await fetch(`${CENTRAL_SERVER}/api/prescriptions?limit=5000`, { signal: AbortSignal.timeout(30000) });
+      if (rxRes.ok) {
+        const rxList = await rxRes.json();
+        for (const rx of (Array.isArray(rxList) ? rxList : [])) {
+          try { await db.prescriptions.add({ ...rx, id: undefined, syncStatus: 'synced' }); } catch {}
+        }
+        report(`Downloaded ${rxList.length} prescriptions...`, 70);
+      }
+
+      // ── Vitals ────────────────────────────────────────────────────────────
+      report('Downloading vitals...', 75);
+      const vRes = await fetch(`${CENTRAL_SERVER}/api/vitals?limit=10000`, { signal: AbortSignal.timeout(30000) });
+      if (vRes.ok) {
+        const vList = await vRes.json();
+        for (const v of (Array.isArray(vList) ? vList : [])) {
+          try { await db.vitals.add({ ...v, id: undefined, syncStatus: 'synced' }); } catch {}
+        }
+        report(`Downloaded ${vList.length} vitals...`, 90);
+      }
+
+      report('Sync complete!', 100);
+      return { success: true, patients: totalPatients };
+    } catch (err) {
+      report(`Pull failed: ${err.message}`, 0);
+      return { success: false, error: err.message };
+    }
+  }
+
+  /**
+   * Sync users from central server to local IndexedDB so all device logins work offline.
+   * The server returns hashed passwords so local bcrypt compare still works.
    */
   async syncUsersFromServer() {
     const serverUrl = await this.getServerUrl();
     if (!serverUrl) return;
     try {
-      const res = await fetch(`${serverUrl}/api/auth/users`, { signal: AbortSignal.timeout(4000) });
+      const res = await fetch(`${serverUrl}/api/auth/users`, { signal: AbortSignal.timeout(5000) });
       if (!res.ok) return;
       const serverUsers = await res.json();
       for (const u of serverUsers) {
         const existing = await db.users.where('username').equalsIgnoreCase(u.username).first();
         if (!existing) {
-          // Add server user locally with a dummy hashed password marker
-          // The real auth will go to server; local is for offline fallback
           await db.users.add({
             ...u,
-            password: u.password || await bcrypt.hash('__server_auth__', 4),
+            isActive: u.isActive === 1 || u.isActive === true,
+          });
+        } else {
+          // Update local copy with server data (keeps password in sync)
+          await db.users.update(existing.id, {
+            password: u.password,
+            name: u.name,
+            role: u.role,
+            permissions: u.permissions,
             isActive: u.isActive === 1 || u.isActive === true,
           });
         }
@@ -103,7 +202,7 @@ class AuthService {
   async createDefaultAdmin() {
     const defaultAdmin = {
       username: 'admin',
-      password: await bcrypt.hash('vardhan@2025', 10),
+      password: await bcrypt.hash('Vardhan@Hospital12*', 10),
       name: 'System Administrator',
       email: 'admin@vardhanhospital.co.in',
       role: 'admin',
@@ -114,8 +213,7 @@ class AuthService {
     };
 
     await db.users.add(defaultAdmin);
-    console.log('Default admin user created (username: admin, password: vardhan@2025)');
-    console.log('⚠️ IMPORTANT: Please change the default password immediately!');
+    console.log('Default admin user created (username: admin)');
   }
 
   /**
@@ -123,25 +221,34 @@ class AuthService {
    */
   async login(username, password) {
     try {
-      // ── Step 1: Try central server ──────────────────────────────────────
+      // ── Step 0: Push any users created offline to server (so they can login from any device)
+      this.syncPendingUsersToServer().catch(() => {});
+
+      // ── Step 1: Try central server first ───────────────────────────────
       const serverResult = await this.loginWithServer(username, password);
       if (serverResult?.success) {
         const serverUser = serverResult.user;
         this.currentUser = { ...serverUser, _authSource: 'server' };
         this.isAuthenticated = true;
         localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
-
-        // Sync server users to local in background
+        // Sync all server users to local DB so offline works
         this.syncUsersFromServer().catch(() => {});
-
-        return { success: true, user: this.currentUser };
+        // If this is a fresh device (no patients), pull all data from server in background
+        const localPatientCount = await db.patients.count().catch(() => 0);
+        if (localPatientCount === 0) {
+          this.pullDataFromServer().catch(() => {});
+        }
+        return { success: true, user: this.currentUser, freshDevice: localPatientCount === 0 };
       }
       if (serverResult && !serverResult.success) {
-        // Server reachable but credentials wrong — don't fall through
+        // Server reachable but credentials wrong — definitive failure
         throw new Error(serverResult.error || 'Invalid username or password');
       }
 
-      // ── Step 2: Local IndexedDB (offline / server unreachable) ──────────
+      // ── Step 2: Server unreachable → sync users first then try local ───
+      // Attempt a quick user sync so newly added users are available offline
+      await this.syncUsersFromServer();
+
       const user = await db.users
         .where('username')
         .equalsIgnoreCase(username)
@@ -256,15 +363,14 @@ class AuthService {
     }
 
     try {
-      // Hash password
       const hashedPassword = await bcrypt.hash(userData.password, 10);
 
       const newUser = {
         username: userData.username,
         password: hashedPassword,
         name: userData.name,
-        email: userData.email,
-        phone: userData.phone,
+        email: userData.email || '',
+        phone: userData.phone || '',
         role: userData.role || 'staff',
         permissions: userData.permissions || this.getDefaultPermissions(userData.role),
         isActive: true,
@@ -273,7 +379,34 @@ class AuthService {
         lastLogin: null
       };
 
-      const userId = await db.users.add(newUser);
+      // ── Push to central server first (single source of truth) ──────────
+      const serverUrl = await this.getServerUrl();
+      let serverId = null;
+      try {
+        const res = await fetch(`${serverUrl}/api/auth/users`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...newUser, plainPassword: userData.password }),
+          signal: AbortSignal.timeout(5000)
+        });
+        if (res.ok) {
+          const data = await res.json();
+          serverId = data.id;
+        }
+      } catch {
+        // Server unreachable — save locally and it will sync when server is back
+      }
+
+      // ── Save locally so this device works offline too ───────────────────
+      const existing = await db.users.where('username').equalsIgnoreCase(userData.username).first();
+      let userId;
+      if (!existing) {
+        userId = await db.users.add({ ...newUser, serverId });
+      } else {
+        userId = existing.id;
+        await db.users.update(userId, { ...newUser, serverId });
+      }
+
       return { success: true, userId };
     } catch (error) {
       console.error('User creation failed:', error);
