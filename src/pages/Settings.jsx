@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Save, Database, Download, Upload, Shield, CheckCircle, AlertTriangle, Wifi, Monitor, Smartphone, Tablet } from 'lucide-react';
-import DatabaseService from '../services/database';
+import { Settings as SettingsIcon, Save, Database, Download, Upload, Shield, CheckCircle, AlertTriangle, Wifi, Monitor, Smartphone, Tablet, RefreshCw, Server } from 'lucide-react';
+import DatabaseService, { db } from '../services/database';
 import licenseService from '../services/licenseService';
 
 function Settings() {
@@ -21,6 +21,9 @@ function Settings() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [licenseInfo, setLicenseInfo] = useState(null);
+  const [pushing, setPushing] = useState(false);
+  const [pushStatus, setPushStatus] = useState(null);
+  const [serverStatus, setServerStatus] = useState(null);
 
   useEffect(() => {
     loadSettings();
@@ -49,6 +52,69 @@ function Settings() {
     };
     setSettings(loadedSettings);
     setLoading(false);
+  };
+
+  const checkServerStatus = async () => {
+    const url = settings.docOnApiUrl;
+    if (!url) return setServerStatus({ ok: false, msg: 'Server URL not set above' });
+    try {
+      const res = await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(3000) });
+      if (res.ok) {
+        const data = await res.json();
+        const stats = await fetch(`${url}/api/stats`).then(r => r.json()).catch(() => ({}));
+        setServerStatus({ ok: true, msg: `✅ Connected — ${stats.patients || 0} patients, ${stats.prescriptions || 0} prescriptions on server` });
+      } else {
+        setServerStatus({ ok: false, msg: `❌ Server returned ${res.status}` });
+      }
+    } catch {
+      setServerStatus({ ok: false, msg: '❌ Cannot reach server. Make sure node server.cjs is running.' });
+    }
+  };
+
+  const handlePushToServer = async () => {
+    const url = settings.docOnApiUrl;
+    if (!url) return alert('Please set and save the Sync Server URL (Doc On API URL field) first.');
+    if (!confirm('Push ALL local data (patients, prescriptions, vitals) to the central server?\n\nThis is safe — existing data on the server is preserved.')) return;
+
+    setPushing(true);
+    setPushStatus({ msg: 'Reading local database...', pct: 0 });
+    try {
+      const BATCH = 500;
+      // Patients
+      const patients = await db.patients.toArray();
+      setPushStatus({ msg: `Pushing ${patients.length} patients...`, pct: 10 });
+      for (let i = 0; i < patients.length; i += BATCH) {
+        await fetch(`${url}/api/patients/bulk`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ patients: patients.slice(i, i + BATCH) })
+        });
+        setPushStatus({ msg: `Pushing patients... ${Math.min(i + BATCH, patients.length)}/${patients.length}`, pct: 10 + Math.round((i / patients.length) * 30) });
+      }
+      // Prescriptions
+      const prescriptions = await db.prescriptions.toArray();
+      setPushStatus({ msg: `Pushing ${prescriptions.length} prescriptions...`, pct: 40 });
+      for (let i = 0; i < prescriptions.length; i += BATCH) {
+        await fetch(`${url}/api/prescriptions/bulk`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prescriptions: prescriptions.slice(i, i + BATCH) })
+        });
+        setPushStatus({ msg: `Pushing prescriptions... ${Math.min(i + BATCH, prescriptions.length)}/${prescriptions.length}`, pct: 40 + Math.round((i / prescriptions.length) * 30) });
+      }
+      // Vitals
+      const vitals = await db.vitals.toArray();
+      setPushStatus({ msg: `Pushing ${vitals.length} vitals...`, pct: 70 });
+      for (let i = 0; i < vitals.length; i += BATCH) {
+        await fetch(`${url}/api/vitals/bulk`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ vitals: vitals.slice(i, i + BATCH) })
+        });
+        setPushStatus({ msg: `Pushing vitals... ${Math.min(i + BATCH, vitals.length)}/${vitals.length}`, pct: 70 + Math.round((i / vitals.length) * 20) });
+      }
+      setPushStatus({ msg: `✅ Done! Pushed ${patients.length} patients, ${prescriptions.length} prescriptions, ${vitals.length} vitals to server.`, pct: 100, done: true });
+    } catch (err) {
+      setPushStatus({ msg: `❌ Push failed: ${err.message}`, error: true });
+    }
+    setPushing(false);
   };
 
   const handleSave = async () => {
@@ -414,6 +480,68 @@ function Settings() {
               />
             </label>
           </div>
+        </div>
+      </div>
+
+      {/* Central Sync Server Setup */}
+      <div className="card border-l-4 border-green-500">
+        <h2 className="text-xl font-bold mb-4 flex items-center space-x-2">
+          <Server className="w-6 h-6 text-green-600" />
+          <span>Central Sync Server — Step-by-Step Setup</span>
+        </h2>
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4 text-sm">
+          <p className="font-semibold text-green-800 mb-2">One-time setup to share data & logins across all devices:</p>
+          <ol className="text-green-700 space-y-1 list-decimal list-inside">
+            <li>On the hospital server PC, open Command Prompt in the app folder</li>
+            <li>Run: <code className="bg-white border border-green-300 rounded px-1">node server.cjs</code> — leave this window open</li>
+            <li>Set the <strong>Doc On API URL</strong> field above to: <code className="bg-white border border-green-300 rounded px-1">http://192.168.1.131:3001</code></li>
+            <li>Click <strong>Save Settings</strong> below</li>
+            <li>Click <strong>Push All Data to Server</strong> (below) — uploads your 71,000+ records</li>
+            <li>All other devices will now login and sync through the server automatically</li>
+          </ol>
+        </div>
+
+        {/* Server Status Check */}
+        <div className="flex items-center space-x-3 mb-4">
+          <button
+            onClick={checkServerStatus}
+            className="btn-secondary flex items-center space-x-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            <span>Test Server Connection</span>
+          </button>
+          {serverStatus && (
+            <p className={`text-sm font-semibold ${serverStatus.ok ? 'text-green-700' : 'text-red-700'}`}>
+              {serverStatus.msg}
+            </p>
+          )}
+        </div>
+
+        {/* Push Data Button */}
+        <div>
+          <button
+            onClick={handlePushToServer}
+            disabled={pushing}
+            className="btn-primary flex items-center space-x-2"
+          >
+            <Upload className="w-5 h-5" />
+            <span>{pushing ? 'Pushing...' : 'Push All Data to Server'}</span>
+          </button>
+          <p className="text-xs text-gray-500 mt-1">
+            Safe to run multiple times — won't duplicate data. Run this once from the admin device to upload all existing data.
+          </p>
+          {pushStatus && (
+            <div className={`mt-3 p-3 rounded-lg ${pushStatus.done ? 'bg-green-50 border border-green-300' : pushStatus.error ? 'bg-red-50 border border-red-300' : 'bg-blue-50 border border-blue-300'}`}>
+              <p className={`text-sm font-semibold ${pushStatus.done ? 'text-green-800' : pushStatus.error ? 'text-red-800' : 'text-blue-800'}`}>
+                {pushStatus.msg}
+              </p>
+              {!pushStatus.done && !pushStatus.error && (
+                <div className="mt-2 h-2 bg-blue-200 rounded-full overflow-hidden">
+                  <div className="h-full bg-blue-600 rounded-full transition-all" style={{ width: `${pushStatus.pct}%` }} />
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

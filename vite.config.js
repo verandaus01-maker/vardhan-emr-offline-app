@@ -15,9 +15,12 @@ export default defineConfig({
         theme_color: '#2563eb',
         background_color: '#ffffff',
         display: 'standalone',
+        display_override: ['standalone', 'minimal-ui'],
         orientation: 'any',
         scope: '/',
         start_url: '/',
+        id: '/',
+        prefer_related_applications: false,
         categories: ['medical', 'productivity', 'health', 'business'],
         lang: 'en-US',
         icons: [
@@ -25,13 +28,25 @@ export default defineConfig({
             src: 'logo192.png',
             sizes: '192x192',
             type: 'image/png',
-            purpose: 'any maskable'
+            purpose: 'any'
+          },
+          {
+            src: 'logo192.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'maskable'
           },
           {
             src: 'logo512.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable'
+            purpose: 'any'
+          },
+          {
+            src: 'logo512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable'
           }
         ]
       },

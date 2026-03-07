@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import {
   Activity, Calendar, FileText, Home, Settings as SettingsIcon,
-  Users, Wifi, WifiOff, RefreshCw, Database, Menu, X, FlaskConical, LogOut, Shield, HardDrive
+  Users, Wifi, WifiOff, RefreshCw, Database, Menu, X, FlaskConical, LogOut, Shield, HardDrive,
+  Download, Smartphone
 } from 'lucide-react';
 import syncService from '../services/syncService';
 import DatabaseService from '../services/database';
@@ -16,6 +17,51 @@ function Layout({ currentUser, onLogout }) {
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [stats, setStats] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+
+  useEffect(() => {
+    // Capture PWA install prompt
+    const handleBeforeInstall = (e) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+      setShowInstallBanner(true);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+
+    // Also show install guide if already in standalone mode
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+      || window.navigator.standalone;
+    if (!isStandalone && !localStorage.getItem('pwaInstallDismissed')) {
+      // Show the banner after 3 seconds if not already installed
+      const timer = setTimeout(() => setShowInstallBanner(true), 3000);
+      return () => {
+        clearTimeout(timer);
+        window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      };
+    }
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (installPrompt) {
+      installPrompt.prompt();
+      const { outcome } = await installPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setInstallPrompt(null);
+        setShowInstallBanner(false);
+      }
+    } else {
+      // Show manual instructions
+      alert(
+        'To install NexaCare Pro:\n\n' +
+        '📱 iPhone/iPad (Safari):\n  Tap Share → "Add to Home Screen"\n\n' +
+        '🤖 Android (Chrome):\n  Tap Menu (⋮) → "Add to Home Screen"\n\n' +
+        '💻 Desktop (Chrome/Edge):\n  Click the install icon (⊕) in the address bar\n\n' +
+        'This gives you offline access and a native app experience!'
+      );
+    }
+  };
 
   useEffect(() => {
     loadStats();
@@ -278,6 +324,48 @@ function Layout({ currentUser, onLogout }) {
           className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-30 no-print"
           onClick={() => setSidebarOpen(false)}
         />
+      )}
+
+      {/* PWA Install Banner */}
+      {showInstallBanner && (
+        <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 bg-gradient-to-r from-blue-600 to-blue-800 text-white rounded-xl shadow-2xl p-4 z-50 no-print">
+          <div className="flex items-start space-x-3">
+            <Smartphone className="w-8 h-8 flex-shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-sm">Install NexaCare Pro</p>
+              <p className="text-xs text-blue-200 mt-0.5">
+                Add to Home Screen for offline access & faster performance
+              </p>
+              <div className="flex space-x-2 mt-2">
+                <button
+                  onClick={handleInstallApp}
+                  className="flex items-center space-x-1 bg-white text-blue-700 text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-blue-50 transition"
+                >
+                  <Download className="w-3 h-3" />
+                  <span>Install Now</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setShowInstallBanner(false);
+                    localStorage.setItem('pwaInstallDismissed', '1');
+                  }}
+                  className="text-xs text-blue-200 hover:text-white px-2 py-1.5 transition"
+                >
+                  Not now
+                </button>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setShowInstallBanner(false);
+                localStorage.setItem('pwaInstallDismissed', '1');
+              }}
+              className="p-1 hover:bg-blue-700 rounded-lg transition flex-shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

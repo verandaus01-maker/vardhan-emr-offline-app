@@ -225,8 +225,12 @@ function App() {
             <Route index element={<Dashboard />} />
             <Route path="patients" element={<PatientSearch />} />
             <Route path="patients/:patientId" element={<PatientDetails />} />
-            <Route path="prescription/:patientId" element={<PrescriptionWriter />} />
-            <Route path="vitals/:patientId" element={<VitalsRecorder />} />
+            <Route path="prescription/:patientId" element={
+              authService.canWrite() ? <PrescriptionWriter /> : <Navigate to="/" replace />
+            } />
+            <Route path="vitals/:patientId" element={
+              authService.canWrite() ? <VitalsRecorder /> : <Navigate to="/" replace />
+            } />
             <Route path="appointments" element={<Appointments />} />
             <Route path="lab-reports" element={<LabReports />} />
             <Route path="reports" element={<Reports />} />
