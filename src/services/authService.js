@@ -6,9 +6,11 @@ import bcrypt from 'bcryptjs';
  * Manages user login, roles, and permissions
  */
 
-// Central sync server — static hospital IP, always reachable on the hospital LAN.
-// Doctors access the app from any IP but the sync server is always at this fixed address.
-const CENTRAL_SERVER = 'http://1.22.20.11:3001';
+// Central sync server URL — derived from the current page's hostname so it works
+// automatically regardless of which IP the hospital PC is accessed from.
+// When doctors open http://192.168.1.131:3000 the server resolves to http://192.168.1.131:3001
+// When opened locally via http://localhost:3000 it resolves to http://localhost:3001
+const CENTRAL_SERVER = `${window.location.protocol}//${window.location.hostname}:3001`;
 
 class AuthService {
   constructor() {
@@ -25,7 +27,11 @@ class AuthService {
   }
 
   /**
-   * Try to authenticate against the central server
+   * Try to authenticate against the central server.
+   * Returns:
+   *   { success: true, user: ... }         — authenticated OK
+   *   { success: false, error: '...', serverReachable: true }  — server up, wrong credentials
+   *   null                                 — server unreachable (network error / timeout)
    */
   async loginWithServer(username, password) {
     const serverUrl = await this.getServerUrl();
@@ -35,12 +41,17 @@ class AuthService {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),
-        signal: AbortSignal.timeout(4000)
+        signal: AbortSignal.timeout(5000)
       });
-      if (!res.ok) return null;
-      return await res.json();
+      const data = await res.json();
+      if (res.status === 401 || res.status === 400) {
+        // Server is reachable and explicitly rejected the credentials
+        return { success: false, error: data.error || 'Invalid username or password', serverReachable: true };
+      }
+      if (!res.ok) return null; // 5xx or other — treat as unreachable
+      return data; // { success: true, user: ... }
     } catch {
-      return null; // Server unreachable — fall through to local
+      return null; // Network error or timeout — fall through to local offline auth
     }
   }
 
@@ -175,7 +186,7 @@ class AuthService {
   async initialize() {
     console.log('Initializing Authentication Service...');
 
-    // Check if there's a stored session
+    // Restore stored session
     const storedUser = localStorage.getItem('currentUser');
     if (storedUser) {
       try {
@@ -187,13 +198,40 @@ class AuthService {
       }
     }
 
-    // Create default admin user if no users exist
-    const users = await db.users?.count() || 0;
+    // Ensure admin always exists locally with the correct password on every device
+    const users = await db.users?.count().catch(() => 0) || 0;
     if (users === 0) {
       await this.createDefaultAdmin();
+    } else {
+      // Make sure the local admin password matches the canonical password
+      // (handles upgrades / password resets / fresh installs on existing DB)
+      await this.ensureAdminPassword();
     }
 
+    // Pull server users in background so all hospital accounts work offline
+    this.syncUsersFromServer().catch(() => {});
+
     console.log('Authentication Service initialized');
+  }
+
+  /**
+   * Ensures the local admin account always has the correct password.
+   * Safe to call on every init — only updates if the hash doesn't match.
+   */
+  async ensureAdminPassword() {
+    try {
+      const admin = await db.users.where('username').equalsIgnoreCase('admin').first();
+      if (!admin) {
+        await this.createDefaultAdmin();
+        return;
+      }
+      const correct = await bcrypt.compare('Vardhan@Hospital12*', admin.password);
+      if (!correct) {
+        const newHash = await bcrypt.hash('Vardhan@Hospital12*', 10);
+        await db.users.update(admin.id, { password: newHash });
+        console.log('Admin password updated to match canonical password');
+      }
+    } catch { /* ignore */ }
   }
 
   /**
@@ -231,22 +269,22 @@ class AuthService {
         this.currentUser = { ...serverUser, _authSource: 'server' };
         this.isAuthenticated = true;
         localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
-        // Sync all server users to local DB so offline works
+        // Sync all server users to local DB so offline logins work after this
         this.syncUsersFromServer().catch(() => {});
-        // If this is a fresh device (no patients), pull all data from server in background
+        // Fresh device — pull all patient data from server in background
         const localPatientCount = await db.patients.count().catch(() => 0);
         if (localPatientCount === 0) {
           this.pullDataFromServer().catch(() => {});
         }
         return { success: true, user: this.currentUser, freshDevice: localPatientCount === 0 };
       }
-      if (serverResult && !serverResult.success) {
-        // Server reachable but credentials wrong — definitive failure
+      if (serverResult?.serverReachable) {
+        // Server is up and explicitly rejected — do NOT fall through to local DB
         throw new Error(serverResult.error || 'Invalid username or password');
       }
 
-      // ── Step 2: Server unreachable → sync users first then try local ───
-      // Attempt a quick user sync so newly added users are available offline
+      // ── Step 2: Server unreachable (null) → try local offline auth ─────
+      // First do a quick user sync in case the server briefly came back up
       await this.syncUsersFromServer();
 
       const user = await db.users
