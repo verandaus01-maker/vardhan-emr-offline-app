@@ -6,7 +6,8 @@ import bcrypt from 'bcryptjs';
  * Manages user login, roles, and permissions
  */
 
-// Central sync server — dedicated hospital server IP, always reachable on LAN
+// Central sync server — static hospital IP, always reachable on the hospital LAN.
+// Doctors access the app from any IP but the sync server is always at this fixed address.
 const CENTRAL_SERVER = 'http://1.22.20.11:3001';
 
 class AuthService {
@@ -40,6 +41,97 @@ class AuthService {
       return await res.json();
     } catch {
       return null; // Server unreachable — fall through to local
+    }
+  }
+
+  /**
+   * Push any locally-created users (created when server was offline) to the central server.
+   * Safe to call repeatedly — server uses ON CONFLICT(username) DO UPDATE.
+   */
+  async syncPendingUsersToServer() {
+    try {
+      const localUsers = await db.users.toArray();
+      // Users without a serverId were created while the server was offline
+      const pending = localUsers.filter(u => !u.serverId);
+      if (pending.length === 0) return { pushed: 0 };
+      let pushed = 0;
+      for (const u of pending) {
+        try {
+          const res = await fetch(`${CENTRAL_SERVER}/api/auth/users`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...u, password: u.password }), // already hashed
+            signal: AbortSignal.timeout(5000)
+          });
+          if (res.ok) {
+            const data = await res.json();
+            await db.users.update(u.id, { serverId: data.id });
+            pushed++;
+          }
+        } catch { /* skip individual failures */ }
+      }
+      return { pushed };
+    } catch {
+      return { pushed: 0 };
+    }
+  }
+
+  /**
+   * Pull ALL patient/prescription/vital data from the central server into local IndexedDB.
+   * Called automatically after login when local DB is empty (fresh device).
+   * Progress callback: fn(msg, pct)
+   */
+  async pullDataFromServer(onProgress) {
+    const report = (msg, pct) => { try { onProgress && onProgress(msg, pct); } catch {} };
+    try {
+      // ── Patients ──────────────────────────────────────────────────────────
+      report('Downloading patients from server...', 5);
+      let page = 1;
+      let totalPatients = 0;
+      while (true) {
+        const res = await fetch(`${CENTRAL_SERVER}/api/patients?page=${page}&limit=500`, { signal: AbortSignal.timeout(30000) });
+        if (!res.ok) break;
+        const { patients } = await res.json();
+        if (!patients || patients.length === 0) break;
+        for (const p of patients) {
+          const existing = await db.patients.where('uhid').equals(p.uhid || '').first();
+          if (!existing) {
+            await db.patients.add({ ...p, id: undefined, syncStatus: 'synced' });
+          }
+        }
+        totalPatients += patients.length;
+        report(`Downloaded ${totalPatients} patients...`, Math.min(5 + Math.round(totalPatients / 200), 50));
+        if (patients.length < 500) break;
+        page++;
+      }
+
+      // ── Prescriptions ─────────────────────────────────────────────────────
+      report('Downloading prescriptions...', 55);
+      const rxRes = await fetch(`${CENTRAL_SERVER}/api/prescriptions?limit=5000`, { signal: AbortSignal.timeout(30000) });
+      if (rxRes.ok) {
+        const rxList = await rxRes.json();
+        for (const rx of (Array.isArray(rxList) ? rxList : [])) {
+          try { await db.prescriptions.add({ ...rx, id: undefined, syncStatus: 'synced' }); } catch {}
+        }
+        report(`Downloaded ${rxList.length} prescriptions...`, 70);
+      }
+
+      // ── Vitals ────────────────────────────────────────────────────────────
+      report('Downloading vitals...', 75);
+      const vRes = await fetch(`${CENTRAL_SERVER}/api/vitals?limit=10000`, { signal: AbortSignal.timeout(30000) });
+      if (vRes.ok) {
+        const vList = await vRes.json();
+        for (const v of (Array.isArray(vList) ? vList : [])) {
+          try { await db.vitals.add({ ...v, id: undefined, syncStatus: 'synced' }); } catch {}
+        }
+        report(`Downloaded ${vList.length} vitals...`, 90);
+      }
+
+      report('Sync complete!', 100);
+      return { success: true, patients: totalPatients };
+    } catch (err) {
+      report(`Pull failed: ${err.message}`, 0);
+      return { success: false, error: err.message };
     }
   }
 
@@ -129,6 +221,9 @@ class AuthService {
    */
   async login(username, password) {
     try {
+      // ── Step 0: Push any users created offline to server (so they can login from any device)
+      this.syncPendingUsersToServer().catch(() => {});
+
       // ── Step 1: Try central server first ───────────────────────────────
       const serverResult = await this.loginWithServer(username, password);
       if (serverResult?.success) {
@@ -138,7 +233,12 @@ class AuthService {
         localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
         // Sync all server users to local DB so offline works
         this.syncUsersFromServer().catch(() => {});
-        return { success: true, user: this.currentUser };
+        // If this is a fresh device (no patients), pull all data from server in background
+        const localPatientCount = await db.patients.count().catch(() => 0);
+        if (localPatientCount === 0) {
+          this.pullDataFromServer().catch(() => {});
+        }
+        return { success: true, user: this.currentUser, freshDevice: localPatientCount === 0 };
       }
       if (serverResult && !serverResult.success) {
         // Server reachable but credentials wrong — definitive failure

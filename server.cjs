@@ -543,10 +543,9 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`  Database: ${DB_PATH}`);
   console.log('');
   console.log('  All hospital devices connect to:');
-  console.log(`  http://YOUR_SERVER_IP:${PORT}`);
+  console.log(`  http://1.22.20.11:${PORT}`);
   console.log('');
-  console.log('  In Settings, set the Doc On API URL to:');
-  console.log(`  http://192.168.1.131:${PORT}`);
+  console.log('  This server must run on the PC with static IP 1.22.20.11');
   console.log('═══════════════════════════════════════════════════════');
   console.log('');
 });
