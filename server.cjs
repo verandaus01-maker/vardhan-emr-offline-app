@@ -547,7 +547,7 @@ if (fs.existsSync(DIST_PATH)) {
   appExpress.use(require('cors')({ origin: '*' }));
   appExpress.use(express.static(DIST_PATH));
   // SPA fallback — all non-asset routes serve index.html
-  appExpress.get('*', (req, res) => {
+  appExpress.use((req, res) => {
     res.sendFile(path.join(DIST_PATH, 'index.html'));
   });
   appExpress.listen(APP_PORT, '0.0.0.0', () => {
