@@ -6,13 +6,15 @@ import bcrypt from 'bcryptjs';
  * Manages user login, roles, and permissions
  *
  * SERVER ARCHITECTURE:
- *   The central sync server is at http://1.22.20.11:3001 — a dedicated static IP
- *   provided by hospital IT Admin. This IP routes to the main hospital PC (192.168.1.131)
- *   via network configuration done by IT. All devices — hospital LAN, tablets, mobiles,
- *   and remote users in Hyderabad — connect to this single address.
+ *   The central sync server always runs on port 3001 of the hospital PC.
+ *   The server URL is derived dynamically from window.location.hostname so the
+ *   app works regardless of which IP/hostname is used to access it:
+ *     - localhost:3000       → syncs to localhost:3001       (hospital PC itself)
+ *     - 192.168.1.131:3000  → syncs to 192.168.1.131:3001  (local WiFi devices)
+ *     - 1.22.20.11:3000     → syncs to 1.22.20.11:3001     (direct/external access)
  *
  * LOGIN FLOW:
- *   1. Try server at 1.22.20.11:3001 (5-second timeout)
+ *   1. Try server at <hostname>:3001 (5-second timeout)
  *   2. If server auth SUCCEEDS → use server result, sync all users locally, pull data if fresh device
  *   3. If server is UNREACHABLE or returns ANY error → fall through to local IndexedDB
  *   4. Local auth: look up user, bcrypt.compare — works fully offline
@@ -23,7 +25,7 @@ import bcrypt from 'bcryptjs';
  *   Admin can ALWAYS log in with: admin / Vardhan@Hospital12*
  */
 
-const CENTRAL_SERVER = 'http://1.22.20.11:3001';
+const CENTRAL_SERVER = `http://${window.location.hostname}:3001`;
 
 class AuthService {
   constructor() {
@@ -238,7 +240,7 @@ class AuthService {
    * Main login entry point.
    *
    * Priority:
-   *   1. Central server (1.22.20.11:3001) — all devices, including remote Hyderabad access
+   *   1. Central server (<hostname>:3001) — all devices use the same hostname they opened the app with
    *   2. Local IndexedDB fallback — when server is offline or unreachable
    *
    * Both paths verify the password. Wrong credentials always fail.

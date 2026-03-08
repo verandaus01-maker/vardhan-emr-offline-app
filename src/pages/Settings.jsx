@@ -57,8 +57,9 @@ function Settings() {
     setLoading(false);
   };
 
-  // Dedicated static IP provided by hospital IT Admin — all devices use this
-  const SYNC_SERVER = 'http://1.22.20.11:3001';
+  // Dynamic: uses the same hostname the browser used to open the app.
+  // localhost:3000 → localhost:3001 | 192.168.1.131:3000 → 192.168.1.131:3001 | 1.22.20.11:3000 → 1.22.20.11:3001
+  const SYNC_SERVER = `http://${window.location.hostname}:3001`;
 
   const checkServerStatus = async () => {
     const url = SYNC_SERVER;
