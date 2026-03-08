@@ -330,14 +330,16 @@ app.post('/api/patients/bulk', (req, res) => {
 
 // ─── Prescriptions Routes ────────────────────────────────────────────────────
 app.get('/api/prescriptions', (req, res) => {
-  const { patientId, uhid, limit = 100, updatedAfter } = req.query;
+  const { patientId, uhid, limit = 5000, page = 1, updatedAfter } = req.query;
+  const lim = parseInt(limit);
+  const offset = (parseInt(page) - 1) * lim;
   let rows;
   if (patientId) {
-    rows = db.prepare('SELECT * FROM prescriptions WHERE patientId=? ORDER BY createdAt DESC LIMIT ?').all(parseInt(patientId), parseInt(limit));
+    rows = db.prepare('SELECT * FROM prescriptions WHERE patientId=? ORDER BY createdAt DESC LIMIT ? OFFSET ?').all(parseInt(patientId), lim, offset);
   } else if (updatedAfter) {
-    rows = db.prepare('SELECT * FROM prescriptions WHERE updatedAt>? OR createdAt>? ORDER BY createdAt DESC LIMIT ?').all(updatedAfter, updatedAfter, parseInt(limit));
+    rows = db.prepare('SELECT * FROM prescriptions WHERE updatedAt>? OR createdAt>? ORDER BY createdAt DESC LIMIT ? OFFSET ?').all(updatedAfter, updatedAfter, lim, offset);
   } else {
-    rows = db.prepare('SELECT * FROM prescriptions ORDER BY createdAt DESC LIMIT ?').all(parseInt(limit));
+    rows = db.prepare('SELECT * FROM prescriptions ORDER BY createdAt DESC LIMIT ? OFFSET ?').all(lim, offset);
   }
   const result = rows.map(r => ({ ...r, medications: tryParse(r.medications), vitals: tryParse(r.vitals), investigations: tryParse(r.investigations) }));
   res.json(result);
@@ -385,14 +387,16 @@ app.post('/api/prescriptions/bulk', (req, res) => {
 
 // ─── Vitals Routes ───────────────────────────────────────────────────────────
 app.get('/api/vitals', (req, res) => {
-  const { patientId, limit = 100, updatedAfter } = req.query;
+  const { patientId, limit = 10000, page = 1, updatedAfter } = req.query;
+  const lim = parseInt(limit);
+  const offset = (parseInt(page) - 1) * lim;
   let rows;
   if (patientId) {
-    rows = db.prepare('SELECT * FROM vitals WHERE patientId=? ORDER BY createdAt DESC LIMIT ?').all(parseInt(patientId), parseInt(limit));
+    rows = db.prepare('SELECT * FROM vitals WHERE patientId=? ORDER BY createdAt DESC LIMIT ? OFFSET ?').all(parseInt(patientId), lim, offset);
   } else if (updatedAfter) {
-    rows = db.prepare('SELECT * FROM vitals WHERE createdAt>? ORDER BY createdAt DESC LIMIT ?').all(updatedAfter, parseInt(limit));
+    rows = db.prepare('SELECT * FROM vitals WHERE createdAt>? ORDER BY createdAt DESC LIMIT ? OFFSET ?').all(updatedAfter, lim, offset);
   } else {
-    rows = db.prepare('SELECT * FROM vitals ORDER BY createdAt DESC LIMIT ?').all(parseInt(limit));
+    rows = db.prepare('SELECT * FROM vitals ORDER BY createdAt DESC LIMIT ? OFFSET ?').all(lim, offset);
   }
   res.json(rows);
 });
@@ -534,18 +538,37 @@ function tryParse(str) {
   try { return JSON.parse(str); } catch { return str; }
 }
 
+// ─── Serve React app on port 3000 (for all devices on hospital network) ──────
+const DIST_PATH = path.join(__dirname, 'dist');
+const APP_PORT = 3000;
+
+if (fs.existsSync(DIST_PATH)) {
+  const appExpress = require('express')();
+  appExpress.use(require('cors')({ origin: '*' }));
+  appExpress.use(express.static(DIST_PATH));
+  // SPA fallback — all non-asset routes serve index.html
+  appExpress.get('*', (req, res) => {
+    res.sendFile(path.join(DIST_PATH, 'index.html'));
+  });
+  appExpress.listen(APP_PORT, '0.0.0.0', () => {
+    console.log(`  App server:  http://0.0.0.0:${APP_PORT}  (serves React build)`);
+  });
+} else {
+  console.log(`  ⚠️  dist/ folder not found — run "npm run build" first for port ${APP_PORT} to work`);
+}
+
 // ─── Start ───────────────────────────────────────────────────────────────────
 app.listen(PORT, '0.0.0.0', () => {
   console.log('');
   console.log('═══════════════════════════════════════════════════════');
   console.log('  NexaCare Pro — Central Sync Server');
-  console.log(`  Running at http://0.0.0.0:${PORT}`);
+  console.log(`  API server:  http://0.0.0.0:${PORT}`);
   console.log(`  Database: ${DB_PATH}`);
   console.log('');
   console.log('  Dedicated static IP (hospital IT): http://1.22.20.11:3001');
   console.log('  Physical PC IP:                   http://192.168.1.131:3001');
   console.log('');
-  console.log('  All devices (hospital + remote Hyderabad) open: http://1.22.20.11:3000');
+  console.log('  All devices (hospital + remote) open: http://1.22.20.11:3000');
   console.log('  IT must: forward 1.22.20.11:3001→192.168.1.131:3001');
   console.log('           forward 1.22.20.11:3000→192.168.1.131:3000');
   console.log('           allow inbound on ports 3000 and 3001 in Windows Firewall');

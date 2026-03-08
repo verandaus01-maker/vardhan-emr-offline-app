@@ -149,26 +149,38 @@ function Settings() {
         if (patients.length < BATCH) break;
         page++;
       }
-      // Prescriptions
+      // Prescriptions (paginated)
       setPullStatus({ msg: 'Downloading prescriptions...', pct: 55 });
-      const rxRes = await fetch(`${url}/api/prescriptions?limit=5000`);
       let totalRx = 0;
-      if (rxRes.ok) {
+      let rxPage = 1;
+      while (true) {
+        const rxRes = await fetch(`${url}/api/prescriptions?page=${rxPage}&limit=${BATCH}`);
+        if (!rxRes.ok) break;
         const rxList = await rxRes.json();
-        for (const rx of (Array.isArray(rxList) ? rxList : [])) {
+        if (!Array.isArray(rxList) || rxList.length === 0) break;
+        for (const rx of rxList) {
           try { await db.prescriptions.add({ ...rx, id: undefined, syncStatus: 'synced' }); totalRx++; } catch {}
         }
-        setPullStatus({ msg: `Downloaded ${totalRx} prescriptions`, pct: 70 });
+        setPullStatus({ msg: `Downloading prescriptions... ${totalRx}`, pct: Math.min(55 + Math.round(totalRx / 100), 70) });
+        if (rxList.length < BATCH) break;
+        rxPage++;
       }
-      // Vitals
+      setPullStatus({ msg: `Downloaded ${totalRx} prescriptions`, pct: 70 });
+      // Vitals (paginated)
       setPullStatus({ msg: 'Downloading vitals...', pct: 75 });
-      const vRes = await fetch(`${url}/api/vitals?limit=10000`);
       let totalVitals = 0;
-      if (vRes.ok) {
+      let vPage = 1;
+      while (true) {
+        const vRes = await fetch(`${url}/api/vitals?page=${vPage}&limit=${BATCH}`);
+        if (!vRes.ok) break;
         const vList = await vRes.json();
-        for (const v of (Array.isArray(vList) ? vList : [])) {
+        if (!Array.isArray(vList) || vList.length === 0) break;
+        for (const v of vList) {
           try { await db.vitals.add({ ...v, id: undefined, syncStatus: 'synced' }); totalVitals++; } catch {}
         }
+        setPullStatus({ msg: `Downloading vitals... ${totalVitals}`, pct: Math.min(75 + Math.round(totalVitals / 100), 88) });
+        if (vList.length < BATCH) break;
+        vPage++;
       }
       // Users
       setPullStatus({ msg: 'Syncing user accounts...', pct: 90 });
