@@ -57,9 +57,8 @@ function Settings() {
     setLoading(false);
   };
 
-  // Dynamic — automatically points to the server running on this PC
-  // e.g. if app is opened at http://192.168.1.131:3000, server resolves to http://192.168.1.131:3001
-  const SYNC_SERVER = `${window.location.protocol}//${window.location.hostname}:3001`;
+  // Dedicated static IP provided by hospital IT Admin — all devices use this
+  const SYNC_SERVER = 'http://1.22.20.11:3001';
 
   const checkServerStatus = async () => {
     const url = SYNC_SERVER;
@@ -209,6 +208,24 @@ function Settings() {
       setUserSyncStatus({ msg: `✅ ${pushed} user(s) synced to server.`, done: true });
     } catch (err) {
       setUserSyncStatus({ msg: `❌ User sync failed: ${err.message}`, error: true });
+    }
+  };
+
+  // Emergency: reset the local admin password to Vardhan@Hospital12* on this device
+  const handleResetAdminPassword = async () => {
+    if (!confirm('Reset local admin password to "Vardhan@Hospital12*" on THIS device?\n\nUse this if admin cannot log in on this device.')) return;
+    try {
+      const bcrypt = (await import('bcryptjs')).default;
+      const hash = await bcrypt.hash('Vardhan@Hospital12*', 10);
+      const existing = (await db.users.where('username').equalsIgnoreCase('admin').toArray())[0];
+      if (existing) {
+        await db.users.update(existing.id, { password: hash, isActive: true });
+      } else {
+        await db.users.add({ username: 'admin', password: hash, name: 'System Administrator', email: 'admin@vardhanhospital.co.in', role: 'admin', permissions: ['all'], isActive: true, createdAt: new Date().toISOString(), lastLogin: null });
+      }
+      alert('✅ Admin password reset to: Vardhan@Hospital12*\n\nYou can now log in with admin / Vardhan@Hospital12*');
+    } catch (err) {
+      alert('❌ Reset failed: ' + err.message);
     }
   };
 
@@ -587,14 +604,14 @@ function Settings() {
         <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4 text-sm">
           <p className="font-semibold text-green-800 mb-2">One-time setup to share data & logins across all devices:</p>
           <ol className="text-green-700 space-y-1 list-decimal list-inside">
-            <li>On the <strong>main hospital PC</strong> (IP: <code className="bg-white border border-green-300 rounded px-1">192.168.1.131</code>), open Command Prompt in the app folder</li>
-            <li>Run: <code className="bg-white border border-green-300 rounded px-1">node server.cjs</code> — leave this window open</li>
-            <li>Server listens on <code className="bg-white border border-green-300 rounded px-1">http://192.168.1.131:3001</code> — all devices auto-connect here</li>
-            <li>On other PCs/tablets, open <code className="bg-white border border-green-300 rounded px-1">http://192.168.1.131:3000</code> in the browser</li>
-            <li>Click <strong>Test Server Connection</strong> below to confirm it is running</li>
-            <li>From the <strong>main PC</strong>: click <strong>Push All Data to Server</strong> — uploads all records</li>
-            <li>From each <strong>doctor/nurse PC</strong>: login first, then click <strong>Pull All Data from Server</strong></li>
-            <li>If users created offline can't login elsewhere: click <strong>Sync Users to Server</strong></li>
+            <li>On the <strong>main hospital PC</strong> (IP <code className="bg-white border border-green-300 rounded px-1">192.168.1.131</code>), open Command Prompt in the app folder and run: <code className="bg-white border border-green-300 rounded px-1">node server.cjs</code> — keep this window open always</li>
+            <li>Hospital IT must forward <code className="bg-white border border-green-300 rounded px-1">1.22.20.11:3001</code> → <code className="bg-white border border-green-300 rounded px-1">192.168.1.131:3001</code> and <code className="bg-white border border-green-300 rounded px-1">1.22.20.11:3000</code> → <code className="bg-white border border-green-300 rounded px-1">192.168.1.131:3000</code> on the router/firewall</li>
+            <li>Windows Firewall on the PC must allow inbound on ports <code className="bg-white border border-green-300 rounded px-1">3000</code> and <code className="bg-white border border-green-300 rounded px-1">3001</code></li>
+            <li>All devices (hospital + Hyderabad) open: <code className="bg-white border border-green-300 rounded px-1">http://1.22.20.11:3000</code></li>
+            <li>Click <strong>Test Server Connection</strong> — should show ✅ Connected</li>
+            <li>From the <strong>main PC only</strong>: click <strong>Push All Data to Server</strong> (uploads all 71,000+ records — do once)</li>
+            <li>From each <strong>doctor/nurse device</strong>: login → then click <strong>Pull All Data from Server</strong></li>
+            <li>If a user was created while server was offline: click <strong>Sync Users to Server</strong></li>
           </ol>
         </div>
 
@@ -685,6 +702,20 @@ function Settings() {
               {userSyncStatus.msg}
             </p>
           )}
+        </div>
+
+        {/* Emergency: Reset Admin Password on this device */}
+        <div className="mt-4 border-t border-gray-200 pt-4">
+          <button
+            onClick={handleResetAdminPassword}
+            className="btn-secondary flex items-center space-x-2 border-red-300 text-red-700 hover:bg-red-50"
+          >
+            <Shield className="w-5 h-5" />
+            <span>Reset Admin Password (Emergency)</span>
+          </button>
+          <p className="text-xs text-gray-500 mt-1">
+            Use only if admin cannot log in on this device. Resets local admin password to <strong>Vardhan@Hospital12*</strong> on this device only.
+          </p>
         </div>
       </div>
 
