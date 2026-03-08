@@ -124,12 +124,16 @@ echo ============================================================
 echo   ALL DONE - NexaCare Pro is running
 echo ============================================================
 echo.
-echo   This PC now responds to TWO IP addresses:
-echo     192.168.1.131  (original LAN IP)
-echo     1.22.20.11     (hospital static IP - NEW)
+echo   DEVICE ACCESS URLS:
 echo.
-echo   EVERYONE accesses the app at:
+echo   [THIS PC / Hospital PC]
+echo     http://localhost:3000
+echo     http://1.22.20.11:3000
 echo.
+echo   [PHONES / LAPTOPS on HOSPITAL WiFi]
+echo     http://192.168.1.131:3000
+echo.
+echo   [REMOTE ACCESS from outside hospital]
 echo     http://1.22.20.11:3000
 echo.
 echo   Admin login:
@@ -139,9 +143,20 @@ echo.
 echo   Two server windows are now open (minimised).
 echo   KEEP THEM OPEN - closing them stops the app.
 echo.
-echo   To verify everything is working, open this URL in a
-echo   browser on THIS PC first:
-echo     http://1.22.20.11:3000
+echo ============================================================
+echo   FIRST TIME SETUP - DATA MIGRATION (do once)
+echo ============================================================
+echo.
+echo   If your old data was in localhost:3000, do this ONCE:
+echo.
+echo   STEP A: Open http://localhost:3000 in browser on this PC
+echo           Login ^> Settings ^> scroll to "Central Server Sync"
+echo           Click "Push All Data to Server"
+echo           Wait for it to finish (may take a few minutes)
+echo.
+echo   STEP B: On any other device, open http://192.168.1.131:3000
+echo           Login ^> Settings ^> Click "Pull All Data from Server"
+echo           OR just log in — it auto-pulls on first login
 echo.
 echo ============================================================
 echo.
