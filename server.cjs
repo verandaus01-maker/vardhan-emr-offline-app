@@ -542,10 +542,13 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`  Running at http://0.0.0.0:${PORT}`);
   console.log(`  Database: ${DB_PATH}`);
   console.log('');
-  console.log('  All hospital devices connect to:');
-  console.log(`  http://192.168.1.131:${PORT}`);
+  console.log('  Dedicated static IP (hospital IT): http://1.22.20.11:3001');
+  console.log('  Physical PC IP:                   http://192.168.1.131:3001');
   console.log('');
-  console.log('  Other devices: open http://192.168.1.131:3000 in their browser');
+  console.log('  All devices (hospital + remote Hyderabad) open: http://1.22.20.11:3000');
+  console.log('  IT must: forward 1.22.20.11:3001→192.168.1.131:3001');
+  console.log('           forward 1.22.20.11:3000→192.168.1.131:3000');
+  console.log('           allow inbound on ports 3000 and 3001 in Windows Firewall');
   console.log('═══════════════════════════════════════════════════════');
   console.log('');
 });
