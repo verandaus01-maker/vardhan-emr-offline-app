@@ -366,31 +366,48 @@ class SyncService {
   }
 
   /**
-   * Merge prescription data
+   * Merge prescription data — deduplicated by uhid+createdAt so that
+   * locally-created records (different local ID vs cloud ID) are not doubled.
    */
   async mergePrescription(cloudPrescription) {
-    const existing = await db.prescriptions.get(cloudPrescription.id);
-
-    if (!existing) {
-      await db.prescriptions.add({
-        ...cloudPrescription,
-        syncStatus: 'synced'
-      });
+    // 1. Fast check by primary key (works when cloud & local IDs match)
+    if (cloudPrescription.id) {
+      const existingById = await db.prescriptions.get(cloudPrescription.id);
+      if (existingById) return;
     }
+    // 2. Dedup check by uhid+createdAt (catches locally-created records
+    //    that were uploaded and came back from cloud with a different ID)
+    if (cloudPrescription.createdAt) {
+      const key = cloudPrescription.uhid || String(cloudPrescription.patientId || '');
+      if (key) {
+        const existingByTime = await db.prescriptions
+          .where('createdAt').equals(cloudPrescription.createdAt)
+          .filter(p => (cloudPrescription.uhid ? p.uhid === cloudPrescription.uhid : p.patientId === cloudPrescription.patientId))
+          .first();
+        if (existingByTime) return;
+      }
+    }
+    await db.prescriptions.add({ ...cloudPrescription, syncStatus: 'synced' });
   }
 
   /**
-   * Merge vitals data
+   * Merge vitals data — deduplicated by uhid+createdAt.
    */
   async mergeVitals(cloudVitals) {
-    const existing = await db.vitals.get(cloudVitals.id);
-
-    if (!existing) {
-      await db.vitals.add({
-        ...cloudVitals,
-        syncStatus: 'synced'
-      });
+    // 1. Fast check by primary key
+    if (cloudVitals.id) {
+      const existingById = await db.vitals.get(cloudVitals.id);
+      if (existingById) return;
     }
+    // 2. Dedup check by uhid+createdAt
+    if (cloudVitals.createdAt) {
+      const existingByTime = await db.vitals
+        .where('createdAt').equals(cloudVitals.createdAt)
+        .filter(v => (cloudVitals.uhid ? v.uhid === cloudVitals.uhid : v.patientId === cloudVitals.patientId))
+        .first();
+      if (existingByTime) return;
+    }
+    await db.vitals.add({ ...cloudVitals, syncStatus: 'synced' });
   }
 
   /**

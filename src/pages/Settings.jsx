@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, Save, Database, Download, Upload, Shield, CheckCircle, AlertTriangle, Wifi, Monitor, Smartphone, Tablet, RefreshCw, Server } from 'lucide-react';
+import { Settings as SettingsIcon, Save, Database, Download, Upload, Shield, CheckCircle, AlertTriangle, Wifi, Monitor, Smartphone, Tablet, RefreshCw, Server, Trash2 } from 'lucide-react';
 import DatabaseService, { db } from '../services/database';
 import licenseService from '../services/licenseService';
 
@@ -27,6 +27,8 @@ function Settings() {
   const [pullStatus, setPullStatus] = useState(null);
   const [userSyncStatus, setUserSyncStatus] = useState(null);
   const [serverStatus, setServerStatus] = useState(null);
+  const [dedupStatus, setDedupStatus] = useState(null);
+  const [serverDedupStatus, setServerDedupStatus] = useState(null);
 
   useEffect(() => {
     loadSettings();
@@ -149,9 +151,9 @@ function Settings() {
         if (patients.length < BATCH) break;
         page++;
       }
-      // Prescriptions (paginated)
+      // Prescriptions (paginated) — check for duplicates before inserting
       setPullStatus({ msg: 'Downloading prescriptions...', pct: 55 });
-      let totalRx = 0;
+      let totalRx = 0, skippedRx = 0;
       let rxPage = 1;
       while (true) {
         const rxRes = await fetch(`${url}/api/prescriptions?page=${rxPage}&limit=${BATCH}`);
@@ -159,16 +161,27 @@ function Settings() {
         const rxList = await rxRes.json();
         if (!Array.isArray(rxList) || rxList.length === 0) break;
         for (const rx of rxList) {
-          try { await db.prescriptions.add({ ...rx, id: undefined, syncStatus: 'synced' }); totalRx++; } catch {}
+          try {
+            // Dedup check: same uhid+createdAt means same prescription — skip it
+            if (rx.createdAt && (rx.uhid || rx.patientId)) {
+              const exists = await db.prescriptions
+                .where('createdAt').equals(rx.createdAt)
+                .filter(p => rx.uhid ? p.uhid === rx.uhid : p.patientId === rx.patientId)
+                .first();
+              if (exists) { skippedRx++; continue; }
+            }
+            await db.prescriptions.add({ ...rx, id: undefined, syncStatus: 'synced' });
+            totalRx++;
+          } catch {}
         }
-        setPullStatus({ msg: `Downloading prescriptions... ${totalRx}`, pct: Math.min(55 + Math.round(totalRx / 100), 70) });
+        setPullStatus({ msg: `Downloading prescriptions... ${totalRx} new, ${skippedRx} already exist`, pct: Math.min(55 + Math.round(totalRx / 100), 70) });
         if (rxList.length < BATCH) break;
         rxPage++;
       }
-      setPullStatus({ msg: `Downloaded ${totalRx} prescriptions`, pct: 70 });
-      // Vitals (paginated)
+      setPullStatus({ msg: `Downloaded ${totalRx} new prescriptions (${skippedRx} duplicates skipped)`, pct: 70 });
+      // Vitals (paginated) — check for duplicates before inserting
       setPullStatus({ msg: 'Downloading vitals...', pct: 75 });
-      let totalVitals = 0;
+      let totalVitals = 0, skippedVitals = 0;
       let vPage = 1;
       while (true) {
         const vRes = await fetch(`${url}/api/vitals?page=${vPage}&limit=${BATCH}`);
@@ -176,9 +189,20 @@ function Settings() {
         const vList = await vRes.json();
         if (!Array.isArray(vList) || vList.length === 0) break;
         for (const v of vList) {
-          try { await db.vitals.add({ ...v, id: undefined, syncStatus: 'synced' }); totalVitals++; } catch {}
+          try {
+            // Dedup check: same uhid+createdAt means same vitals record — skip it
+            if (v.createdAt && (v.uhid || v.patientId)) {
+              const exists = await db.vitals
+                .where('createdAt').equals(v.createdAt)
+                .filter(vt => v.uhid ? vt.uhid === v.uhid : vt.patientId === v.patientId)
+                .first();
+              if (exists) { skippedVitals++; continue; }
+            }
+            await db.vitals.add({ ...v, id: undefined, syncStatus: 'synced' });
+            totalVitals++;
+          } catch {}
         }
-        setPullStatus({ msg: `Downloading vitals... ${totalVitals}`, pct: Math.min(75 + Math.round(totalVitals / 100), 88) });
+        setPullStatus({ msg: `Downloading vitals... ${totalVitals} new, ${skippedVitals} already exist`, pct: Math.min(75 + Math.round(totalVitals / 100), 88) });
         if (vList.length < BATCH) break;
         vPage++;
       }
@@ -221,6 +245,39 @@ function Settings() {
       setUserSyncStatus({ msg: `✅ ${pushed} user(s) synced to server.`, done: true });
     } catch (err) {
       setUserSyncStatus({ msg: `❌ User sync failed: ${err.message}`, error: true });
+    }
+  };
+
+  // Remove duplicate prescriptions and vitals from this device's local database
+  const handleCleanLocalDuplicates = async () => {
+    if (!confirm('Remove duplicate prescriptions and vitals from THIS device?\n\nThis is safe — only exact duplicates (same patient + same timestamp) are removed. Original records are kept.')) return;
+    setDedupStatus({ msg: 'Scanning for duplicates...', running: true });
+    try {
+      const result = await DatabaseService.deduplicateLocalData();
+      setDedupStatus({
+        msg: `✅ Done! Removed ${result.prescriptions} duplicate prescription(s) and ${result.vitals} duplicate vital(s). Reload to see updated counts.`,
+        done: true
+      });
+    } catch (err) {
+      setDedupStatus({ msg: `❌ Failed: ${err.message}`, error: true });
+    }
+  };
+
+  // Remove duplicates from the CENTRAL SERVER database
+  const handleDeduplicateServer = async () => {
+    const url = SYNC_SERVER;
+    if (!confirm('Remove duplicate prescriptions and vitals from the CENTRAL SERVER?\n\nThis is safe — only exact duplicates are removed. Run this ONCE to fix inflated counts.')) return;
+    setServerDedupStatus({ msg: 'Cleaning server duplicates...' });
+    try {
+      const res = await fetch(`${url}/api/admin/dedup`, { method: 'POST', signal: AbortSignal.timeout(120000) });
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
+      const data = await res.json();
+      setServerDedupStatus({
+        msg: `✅ Server cleaned! Removed ${data.removed.prescriptions} duplicate prescription(s) and ${data.removed.vitals} duplicate vital(s). Server now has ${data.remaining.prescriptions} prescriptions and ${data.remaining.vitals} vitals.`,
+        done: true
+      });
+    } catch (err) {
+      setServerDedupStatus({ msg: `❌ Failed: ${err.message}`, error: true });
     }
   };
 
@@ -805,6 +862,57 @@ function Settings() {
             <li>Or in Chrome: click the install icon in the address bar (⊕)</li>
             <li>The app opens in full-screen, works offline after first load</li>
           </ol>
+        </div>
+      </div>
+
+      {/* Clean Duplicate Records */}
+      <div className="card border-l-4 border-orange-500">
+        <h2 className="text-xl font-bold mb-1 flex items-center space-x-2">
+          <Trash2 className="w-6 h-6 text-orange-600" />
+          <span>Fix Inflated Record Counts</span>
+        </h2>
+        <p className="text-sm text-gray-600 mb-4">
+          If your prescription or vitals counts look too high (e.g. 70,000+ for a small hospital), it means
+          duplicate records were created by running "Pull All Data" multiple times. Use these tools to clean them up.
+        </p>
+
+        {/* Server dedup */}
+        <div className="mb-4 pb-4 border-b border-gray-200">
+          <p className="text-sm font-semibold text-gray-700 mb-2">Step 1 — Clean the Central Server (do this first):</p>
+          <button
+            onClick={handleDeduplicateServer}
+            className="btn-primary flex items-center space-x-2 bg-orange-600 hover:bg-orange-700"
+          >
+            <Trash2 className="w-5 h-5" />
+            <span>Remove Server Duplicates</span>
+          </button>
+          <p className="text-xs text-gray-500 mt-1">Connects to the server and permanently removes all exact duplicate prescriptions &amp; vitals. Run once.</p>
+          {serverDedupStatus && (
+            <div className={`mt-3 p-3 rounded-lg text-sm font-semibold ${serverDedupStatus.done ? 'bg-green-50 border border-green-300 text-green-800' : serverDedupStatus.error ? 'bg-red-50 border border-red-300 text-red-800' : 'bg-blue-50 border border-blue-300 text-blue-800'}`}>
+              {serverDedupStatus.msg}
+            </div>
+          )}
+        </div>
+
+        {/* Local dedup */}
+        <div>
+          <p className="text-sm font-semibold text-gray-700 mb-2">Step 2 — Clean This Device (run on each device):</p>
+          <button
+            onClick={handleCleanLocalDuplicates}
+            className="btn-secondary flex items-center space-x-2"
+          >
+            <Trash2 className="w-5 h-5" />
+            <span>Remove Local Duplicates</span>
+          </button>
+          <p className="text-xs text-gray-500 mt-1">Scans this device's offline database and removes duplicate records. Then reload the page to see corrected counts.</p>
+          {dedupStatus && (
+            <div className={`mt-3 p-3 rounded-lg text-sm font-semibold ${dedupStatus.done ? 'bg-green-50 border border-green-300 text-green-800' : dedupStatus.error ? 'bg-red-50 border border-red-300 text-red-800' : 'bg-blue-50 border border-blue-300 text-blue-800'}`}>
+              {dedupStatus.msg}
+              {dedupStatus.done && (
+                <button onClick={() => window.location.reload()} className="ml-4 underline">Reload now</button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
