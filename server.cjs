@@ -330,14 +330,30 @@ app.post('/api/patients/bulk', (req, res) => {
 
 // ─── Prescriptions Routes ────────────────────────────────────────────────────
 app.get('/api/prescriptions', (req, res) => {
-  const { patientId, uhid, limit = 100, updatedAfter } = req.query;
+  const { patientId, uhid, limit = 5000, page = 1, updatedAfter } = req.query;
+  const lim = parseInt(limit);
+  const offset = (parseInt(page) - 1) * lim;
   let rows;
+  // All queries use dedup subquery: keep only MIN(id) per unique uhid+createdAt
   if (patientId) {
-    rows = db.prepare('SELECT * FROM prescriptions WHERE patientId=? ORDER BY createdAt DESC LIMIT ?').all(parseInt(patientId), parseInt(limit));
+    rows = db.prepare(`
+      SELECT p.* FROM prescriptions p
+      INNER JOIN (SELECT MIN(id) as id FROM prescriptions WHERE patientId=? GROUP BY COALESCE(uhid,''), COALESCE(createdAt,'')) d ON p.id = d.id
+      ORDER BY p.createdAt DESC LIMIT ? OFFSET ?
+    `).all(parseInt(patientId), lim, offset);
   } else if (updatedAfter) {
-    rows = db.prepare('SELECT * FROM prescriptions WHERE updatedAt>? OR createdAt>? ORDER BY createdAt DESC LIMIT ?').all(updatedAfter, updatedAfter, parseInt(limit));
+    rows = db.prepare(`
+      SELECT p.* FROM prescriptions p
+      INNER JOIN (SELECT MIN(id) as id FROM prescriptions GROUP BY COALESCE(uhid,''), COALESCE(createdAt,'')) d ON p.id = d.id
+      WHERE p.updatedAt>? OR p.createdAt>?
+      ORDER BY p.createdAt DESC LIMIT ? OFFSET ?
+    `).all(updatedAfter, updatedAfter, lim, offset);
   } else {
-    rows = db.prepare('SELECT * FROM prescriptions ORDER BY createdAt DESC LIMIT ?').all(parseInt(limit));
+    rows = db.prepare(`
+      SELECT p.* FROM prescriptions p
+      INNER JOIN (SELECT MIN(id) as id FROM prescriptions GROUP BY COALESCE(uhid,''), COALESCE(createdAt,'')) d ON p.id = d.id
+      ORDER BY p.createdAt DESC LIMIT ? OFFSET ?
+    `).all(lim, offset);
   }
   const result = rows.map(r => ({ ...r, medications: tryParse(r.medications), vitals: tryParse(r.vitals), investigations: tryParse(r.investigations) }));
   res.json(result);
@@ -385,14 +401,30 @@ app.post('/api/prescriptions/bulk', (req, res) => {
 
 // ─── Vitals Routes ───────────────────────────────────────────────────────────
 app.get('/api/vitals', (req, res) => {
-  const { patientId, limit = 100, updatedAfter } = req.query;
+  const { patientId, limit = 10000, page = 1, updatedAfter } = req.query;
+  const lim = parseInt(limit);
+  const offset = (parseInt(page) - 1) * lim;
   let rows;
+  // All queries use dedup subquery: keep only MIN(id) per unique uhid+createdAt
   if (patientId) {
-    rows = db.prepare('SELECT * FROM vitals WHERE patientId=? ORDER BY createdAt DESC LIMIT ?').all(parseInt(patientId), parseInt(limit));
+    rows = db.prepare(`
+      SELECT v.* FROM vitals v
+      INNER JOIN (SELECT MIN(id) as id FROM vitals WHERE patientId=? GROUP BY COALESCE(uhid,''), COALESCE(createdAt,'')) d ON v.id = d.id
+      ORDER BY v.createdAt DESC LIMIT ? OFFSET ?
+    `).all(parseInt(patientId), lim, offset);
   } else if (updatedAfter) {
-    rows = db.prepare('SELECT * FROM vitals WHERE createdAt>? ORDER BY createdAt DESC LIMIT ?').all(updatedAfter, parseInt(limit));
+    rows = db.prepare(`
+      SELECT v.* FROM vitals v
+      INNER JOIN (SELECT MIN(id) as id FROM vitals GROUP BY COALESCE(uhid,''), COALESCE(createdAt,'')) d ON v.id = d.id
+      WHERE v.createdAt>?
+      ORDER BY v.createdAt DESC LIMIT ? OFFSET ?
+    `).all(updatedAfter, lim, offset);
   } else {
-    rows = db.prepare('SELECT * FROM vitals ORDER BY createdAt DESC LIMIT ?').all(parseInt(limit));
+    rows = db.prepare(`
+      SELECT v.* FROM vitals v
+      INNER JOIN (SELECT MIN(id) as id FROM vitals GROUP BY COALESCE(uhid,''), COALESCE(createdAt,'')) d ON v.id = d.id
+      ORDER BY v.createdAt DESC LIMIT ? OFFSET ?
+    `).all(lim, offset);
   }
   res.json(rows);
 });
@@ -504,11 +536,49 @@ app.get('/api/sync/changes', (req, res) => {
   const sinceDate = since || new Date(0).toISOString();
   res.json({
     patients: db.prepare('SELECT * FROM patients WHERE updatedAt>? OR createdAt>?').all(sinceDate, sinceDate),
-    prescriptions: db.prepare('SELECT * FROM prescriptions WHERE updatedAt>? OR createdAt>?').all(sinceDate, sinceDate).map(r => ({ ...r, medications: tryParse(r.medications) })),
-    vitals: db.prepare('SELECT * FROM vitals WHERE createdAt>?').all(sinceDate),
+    // Return only deduplicated prescriptions/vitals (no duplicates sent to client)
+    prescriptions: db.prepare(`
+      SELECT p.* FROM prescriptions p
+      INNER JOIN (SELECT MIN(id) as id FROM prescriptions GROUP BY COALESCE(uhid,''), COALESCE(createdAt,'')) d ON p.id = d.id
+      WHERE p.updatedAt>? OR p.createdAt>?
+    `).all(sinceDate, sinceDate).map(r => ({ ...r, medications: tryParse(r.medications) })),
+    vitals: db.prepare(`
+      SELECT v.* FROM vitals v
+      INNER JOIN (SELECT MIN(id) as id FROM vitals GROUP BY COALESCE(uhid,''), COALESCE(createdAt,'')) d ON v.id = d.id
+      WHERE v.createdAt>?
+    `).all(sinceDate),
     appointments: db.prepare('SELECT * FROM appointments WHERE updatedAt>? OR createdAt>?').all(sinceDate, sinceDate),
     labReports: db.prepare('SELECT * FROM labReports WHERE createdAt>?').all(sinceDate).map(r => ({ ...r, results: tryParse(r.results) }))
   });
+});
+
+// ─── Admin: Deduplicate server database ──────────────────────────────────────
+// Removes duplicate prescriptions and vitals (keeps earliest record per patient+timestamp)
+app.post('/api/admin/dedup', (req, res) => {
+  try {
+    const rxDel = db.prepare(`
+      DELETE FROM prescriptions WHERE id NOT IN (
+        SELECT MIN(id) FROM prescriptions GROUP BY COALESCE(uhid,''), COALESCE(createdAt,'')
+      )
+    `).run();
+    const vDel = db.prepare(`
+      DELETE FROM vitals WHERE id NOT IN (
+        SELECT MIN(id) FROM vitals GROUP BY COALESCE(uhid,''), COALESCE(createdAt,'')
+      )
+    `).run();
+    const stats = {
+      prescriptions: db.prepare('SELECT COUNT(*) as c FROM prescriptions').get().c,
+      vitals: db.prepare('SELECT COUNT(*) as c FROM vitals').get().c,
+    };
+    console.log(`Dedup complete: removed ${rxDel.changes} prescription dupes, ${vDel.changes} vital dupes`);
+    res.json({
+      success: true,
+      removed: { prescriptions: rxDel.changes, vitals: vDel.changes },
+      remaining: stats
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // Stats
@@ -534,21 +604,71 @@ function tryParse(str) {
   try { return JSON.parse(str); } catch { return str; }
 }
 
+// ─── Serve React app on port 3000 (for all devices on hospital network) ──────
+const DIST_PATH = path.join(__dirname, 'dist');
+const APP_PORT = 3000;
+
+if (fs.existsSync(DIST_PATH)) {
+  const appExpress = require('express')();
+  appExpress.use(require('cors')({ origin: '*' }));
+  appExpress.use(express.static(DIST_PATH));
+  // SPA fallback — all non-asset routes serve index.html
+  appExpress.use((req, res) => {
+    res.sendFile(path.join(DIST_PATH, 'index.html'));
+  });
+  appExpress.listen(APP_PORT, '0.0.0.0', () => {
+    console.log(`  App server:  http://0.0.0.0:${APP_PORT}  (serves React build)`);
+  });
+} else {
+  console.log(`  ⚠️  dist/ folder not found — run "npm run build" first for port ${APP_PORT} to work`);
+}
+
 // ─── Start ───────────────────────────────────────────────────────────────────
 app.listen(PORT, '0.0.0.0', () => {
   console.log('');
   console.log('═══════════════════════════════════════════════════════');
   console.log('  NexaCare Pro — Central Sync Server');
-  console.log(`  Running at http://0.0.0.0:${PORT}`);
+  console.log(`  API server:  http://0.0.0.0:${PORT}`);
   console.log(`  Database: ${DB_PATH}`);
   console.log('');
   console.log('  Dedicated static IP (hospital IT): http://1.22.20.11:3001');
   console.log('  Physical PC IP:                   http://192.168.1.131:3001');
   console.log('');
-  console.log('  All devices (hospital + remote Hyderabad) open: http://1.22.20.11:3000');
+  console.log('  All devices (hospital + remote) open: http://1.22.20.11:3000');
   console.log('  IT must: forward 1.22.20.11:3001→192.168.1.131:3001');
   console.log('           forward 1.22.20.11:3000→192.168.1.131:3000');
   console.log('           allow inbound on ports 3000 and 3001 in Windows Firewall');
   console.log('═══════════════════════════════════════════════════════');
+
+  // ── Optional: remote access tunnel (run with --tunnel flag or ENABLE_TUNNEL=true) ──
+  const enableTunnel = process.argv.includes('--tunnel') || process.env.ENABLE_TUNNEL === 'true';
+  if (enableTunnel) {
+    const { spawn } = require('child_process');
+    console.log('');
+    console.log('  🌐 Starting remote access tunnel (for Hyderabad access)...');
+    const lt = spawn('npx', ['--yes', 'localtunnel', '--port', `${APP_PORT}`], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: process.platform === 'win32'
+    });
+    lt.stdout.on('data', (data) => {
+      const line = data.toString().trim();
+      if (line.startsWith('your url is:') || line.startsWith('https://')) {
+        const url = line.replace('your url is:', '').trim();
+        console.log(`  🌐 REMOTE URL: ${url}`);
+        console.log(`     Share this with Hyderabad: ${url}`);
+        console.log('     (Tunnel is active — keep this window open)');
+      }
+    });
+    lt.stderr.on('data', (data) => {
+      const line = data.toString().trim();
+      if (line.includes('https://')) console.log(`  🌐 REMOTE URL: ${line}`);
+    });
+    lt.on('error', (e) => console.log(`  ⚠️  Tunnel error: ${e.message}`));
+    lt.on('close', (code) => code !== 0 && console.log('  ⚠️  Tunnel closed. Restart with --tunnel to reconnect.'));
+  } else {
+    console.log('');
+    console.log('  💡 For remote access from Hyderabad, restart with:');
+    console.log('     node server.cjs --tunnel   (Windows: start-hospital-server.bat --tunnel)');
+  }
   console.log('');
 });

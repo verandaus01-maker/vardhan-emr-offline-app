@@ -432,6 +432,52 @@ export class DatabaseService {
     await db.delete();
     await db.open();
   }
+
+  /**
+   * Remove local duplicate prescriptions and vitals.
+   * Keeps the FIRST (lowest id) record for each unique uhid+createdAt pair.
+   * Returns count of records removed.
+   */
+  static async deduplicateLocalData() {
+    const result = { prescriptions: 0, vitals: 0 };
+
+    // Deduplicate prescriptions
+    const allRx = await db.prescriptions.orderBy('id').toArray();
+    const seenRx = new Map();
+    const dupRxIds = [];
+    for (const rx of allRx) {
+      const key = `${rx.uhid || rx.patientId || ''}|${rx.createdAt || ''}`;
+      if (seenRx.has(key)) {
+        dupRxIds.push(rx.id);
+      } else {
+        seenRx.set(key, rx.id);
+      }
+    }
+    if (dupRxIds.length > 0) {
+      await db.prescriptions.bulkDelete(dupRxIds);
+      result.prescriptions = dupRxIds.length;
+    }
+
+    // Deduplicate vitals
+    const allVitals = await db.vitals.orderBy('id').toArray();
+    const seenVitals = new Map();
+    const dupVitalIds = [];
+    for (const v of allVitals) {
+      const key = `${v.uhid || v.patientId || ''}|${v.createdAt || ''}`;
+      if (seenVitals.has(key)) {
+        dupVitalIds.push(v.id);
+      } else {
+        seenVitals.set(key, v.id);
+      }
+    }
+    if (dupVitalIds.length > 0) {
+      await db.vitals.bulkDelete(dupVitalIds);
+      result.vitals = dupVitalIds.length;
+    }
+
+    console.log(`Local dedup: removed ${result.prescriptions} prescription dupes, ${result.vitals} vital dupes`);
+    return result;
+  }
 }
 
 export default DatabaseService;

@@ -248,7 +248,7 @@ function Layout({ currentUser, onLogout }) {
         {/* Sidebar */}
         <aside className={`
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-          lg:translate-x-0 fixed lg:sticky top-0 left-0 h-screen
+          lg:translate-x-0 fixed lg:sticky top-0 lg:top-[80px] left-0 h-screen lg:h-[calc(100vh-80px)]
           w-64 bg-white shadow-xl transition-transform duration-300 ease-in-out z-40
           flex flex-col no-print
         `}>
@@ -411,16 +411,21 @@ function Layout({ currentUser, onLogout }) {
                   <li>Tap <strong>Add</strong> to confirm</li>
                 </ol>
               </div>
-              {/* Desktop */}
+              {/* Mac */}
               <div className="border border-gray-200 rounded-xl p-4">
                 <p className="font-bold text-gray-800 mb-2 flex items-center space-x-2">
                   <span className="text-xl">💻</span>
-                  <span>Desktop (Chrome / Edge)</span>
+                  <span>Mac — Chrome (Recommended)</span>
                 </p>
                 <ol className="text-sm text-gray-600 space-y-1.5 list-decimal list-inside">
-                  <li>Look for the <strong>install icon (⊕)</strong> in the address bar</li>
-                  <li>Click it and choose <strong>Install</strong></li>
+                  <li>Open <strong>Google Chrome</strong> on your Mac</li>
+                  <li>Look for the <strong>install icon (⊕)</strong> at the right of the address bar</li>
+                  <li>Click it and choose <strong>"Install NexaCare Pro"</strong></li>
+                  <li>App appears in your Dock & Launchpad — works offline!</li>
                 </ol>
+                <p className="text-xs text-blue-600 mt-2 font-medium">
+                  💡 Safari: Go to <strong>File → Add to Dock</strong> (macOS Sonoma+)
+                </p>
               </div>
               <p className="text-xs text-gray-400 text-center">
                 The app works offline after installation. Data syncs when connected to the hospital network.
