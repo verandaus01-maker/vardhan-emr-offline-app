@@ -1,20 +1,21 @@
 import DatabaseService, { db } from './database';
 import bcrypt from 'bcryptjs';
+import { getServerUrl } from '../utils/serverUrl';
 
 /**
  * Authentication and Authorization Service
  * Manages user login, roles, and permissions
  *
  * SERVER ARCHITECTURE:
- *   The central sync server always runs on port 3001 of the hospital PC.
- *   The server URL is derived dynamically from window.location.hostname so the
- *   app works regardless of which IP/hostname is used to access it:
- *     - localhost:3000       → syncs to localhost:3001       (hospital PC itself)
- *     - 192.168.1.131:3000  → syncs to 192.168.1.131:3001  (local WiFi devices)
- *     - 1.22.20.11:3000     → syncs to 1.22.20.11:3001     (direct/external access)
+ *   The API server URL is resolved dynamically by getServerUrl() so the
+ *   app works on all deployments without any config:
+ *     - Cloud (Railway/Render HTTPS):  same origin  (https://app.railway.app)
+ *     - Hospital local (port 3000):    hostname:3001 (http://192.168.1.131:3001)
+ *     - Hospital local (port 3001):    hostname:3001
+ *     - Dev (localhost:3000):          localhost:3001
  *
  * LOGIN FLOW:
- *   1. Try server at <hostname>:3001 (5-second timeout)
+ *   1. Try server (5-second timeout)
  *   2. If server auth SUCCEEDS → use server result, sync all users locally, pull data if fresh device
  *   3. If server is UNREACHABLE or returns ANY error → fall through to local IndexedDB
  *   4. Local auth: look up user, bcrypt.compare — works fully offline
@@ -25,7 +26,8 @@ import bcrypt from 'bcryptjs';
  *   Admin can ALWAYS log in with: admin / Vardhan@Hospital12*
  */
 
-const CENTRAL_SERVER = `http://${window.location.hostname}:3001`;
+// Lazily resolved so it picks up the runtime window.location
+const CENTRAL_SERVER = getServerUrl();
 
 class AuthService {
   constructor() {

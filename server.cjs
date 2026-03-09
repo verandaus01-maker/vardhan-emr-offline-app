@@ -15,10 +15,19 @@ const path = require('path');
 const fs = require('fs');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = parseInt(process.env.PORT || '3001');
+
+// ─── Cloud vs Local detection ────────────────────────────────────────────────
+// Railway / Render always set process.env.PORT. Hospital local never does.
+const IS_CLOUD = !!process.env.PORT;
 
 // ─── Database setup ─────────────────────────────────────────────────────────
-const DB_PATH = path.join(__dirname, 'nexacare-server.db');
+// DATABASE_PATH env allows persistent storage on Railway volumes
+// Railway volume: set env var DATABASE_PATH=/data/nexacare-server.db and mount volume at /data
+const DB_PATH = process.env.DATABASE_PATH
+  || (process.env.RAILWAY_VOLUME_MOUNT_PATH
+    ? path.join(process.env.RAILWAY_VOLUME_MOUNT_PATH, 'nexacare-server.db')
+    : path.join(__dirname, 'nexacare-server.db'));
 const db = new Database(DB_PATH);
 
 // Enable WAL mode for better concurrent read performance
@@ -604,71 +613,48 @@ function tryParse(str) {
   try { return JSON.parse(str); } catch { return str; }
 }
 
-// ─── Serve React app on port 3000 (for all devices on hospital network) ──────
+// ─── Serve React app ─────────────────────────────────────────────────────────
 const DIST_PATH = path.join(__dirname, 'dist');
 const APP_PORT = 3000;
 
 if (fs.existsSync(DIST_PATH)) {
-  const appExpress = require('express')();
-  appExpress.use(require('cors')({ origin: '*' }));
-  appExpress.use(express.static(DIST_PATH));
-  // SPA fallback — all non-asset routes serve index.html
-  appExpress.use((req, res) => {
+  // Always serve React app from the MAIN port (PORT/3001).
+  // This makes cloud deployment (Railway/Render single-port) work out of the box.
+  app.use(express.static(DIST_PATH, { maxAge: '1d', etag: true }));
+  // SPA fallback: all non-/api/* routes return index.html
+  app.get(/^(?!\/api\/).*/, (req, res) => {
     res.sendFile(path.join(DIST_PATH, 'index.html'));
   });
-  appExpress.listen(APP_PORT, '0.0.0.0', () => {
-    console.log(`  App server:  http://0.0.0.0:${APP_PORT}  (serves React build)`);
-  });
+
+  // Also serve on port 3000 for hospital local network backward compatibility.
+  // (Hospital devices already bookmarked :3000 — keep that working.)
+  if (!IS_CLOUD) {
+    const appExpress = require('express')();
+    appExpress.use(require('cors')({ origin: '*' }));
+    appExpress.use(express.static(DIST_PATH));
+    appExpress.get('*', (req, res) => res.sendFile(path.join(DIST_PATH, 'index.html')));
+    appExpress.listen(APP_PORT, '0.0.0.0', () => {
+      console.log(`  App server (local):  http://0.0.0.0:${APP_PORT}`);
+    });
+  }
 } else {
-  console.log(`  ⚠️  dist/ folder not found — run "npm run build" first for port ${APP_PORT} to work`);
+  console.log(`  ⚠️  dist/ folder not found — run "npm run build" first`);
 }
 
 // ─── Start ───────────────────────────────────────────────────────────────────
 app.listen(PORT, '0.0.0.0', () => {
   console.log('');
   console.log('═══════════════════════════════════════════════════════');
-  console.log('  NexaCare Pro — Central Sync Server');
-  console.log(`  API server:  http://0.0.0.0:${PORT}`);
-  console.log(`  Database: ${DB_PATH}`);
-  console.log('');
-  console.log('  Dedicated static IP (hospital IT): http://1.22.20.11:3001');
-  console.log('  Physical PC IP:                   http://192.168.1.131:3001');
-  console.log('');
-  console.log('  All devices (hospital + remote) open: http://1.22.20.11:3000');
-  console.log('  IT must: forward 1.22.20.11:3001→192.168.1.131:3001');
-  console.log('           forward 1.22.20.11:3000→192.168.1.131:3000');
-  console.log('           allow inbound on ports 3000 and 3001 in Windows Firewall');
-  console.log('═══════════════════════════════════════════════════════');
-
-  // ── Optional: remote access tunnel (run with --tunnel flag or ENABLE_TUNNEL=true) ──
-  const enableTunnel = process.argv.includes('--tunnel') || process.env.ENABLE_TUNNEL === 'true';
-  if (enableTunnel) {
-    const { spawn } = require('child_process');
-    console.log('');
-    console.log('  🌐 Starting remote access tunnel (for Hyderabad access)...');
-    const lt = spawn('npx', ['--yes', 'localtunnel', '--port', `${APP_PORT}`], {
-      stdio: ['ignore', 'pipe', 'pipe'],
-      shell: process.platform === 'win32'
-    });
-    lt.stdout.on('data', (data) => {
-      const line = data.toString().trim();
-      if (line.startsWith('your url is:') || line.startsWith('https://')) {
-        const url = line.replace('your url is:', '').trim();
-        console.log(`  🌐 REMOTE URL: ${url}`);
-        console.log(`     Share this with Hyderabad: ${url}`);
-        console.log('     (Tunnel is active — keep this window open)');
-      }
-    });
-    lt.stderr.on('data', (data) => {
-      const line = data.toString().trim();
-      if (line.includes('https://')) console.log(`  🌐 REMOTE URL: ${line}`);
-    });
-    lt.on('error', (e) => console.log(`  ⚠️  Tunnel error: ${e.message}`));
-    lt.on('close', (code) => code !== 0 && console.log('  ⚠️  Tunnel closed. Restart with --tunnel to reconnect.'));
+  console.log('  NexaCare Pro — Vardhan Hospital EMR Server');
+  console.log(`  Port: ${PORT}  |  DB: ${DB_PATH}`);
+  if (IS_CLOUD) {
+    console.log('  Mode: CLOUD — React app + API on same port');
+    console.log('  URL:  set by Railway/Render (check dashboard)');
   } else {
-    console.log('');
-    console.log('  💡 For remote access from Hyderabad, restart with:');
-    console.log('     node server.cjs --tunnel   (Windows: start-hospital-server.bat --tunnel)');
+    console.log('  Mode: LOCAL HOSPITAL');
+    console.log(`  App (React):  http://0.0.0.0:${APP_PORT}  → http://1.22.20.11:3000`);
+    console.log(`  API server:   http://0.0.0.0:${PORT}  → http://1.22.20.11:3001`);
   }
+  console.log('═══════════════════════════════════════════════════════');
   console.log('');
 });

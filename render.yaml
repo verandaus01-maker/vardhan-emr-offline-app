@@ -1,0 +1,26 @@
+# Render.com deployment — NexaCare Pro / Vardhan Hospital EMR
+# Alternative to Railway. Free tier available but spins down after 15 min idle.
+# For always-on, use Starter plan ($7/month) which includes persistent disk.
+#
+# SETUP (one time):
+# 1. Go to https://render.com → New Web Service → Connect GitHub repo
+# 2. Render detects this file automatically
+# 3. Deploy → get permanent URL (e.g. https://vardhan-emr.onrender.com)
+
+services:
+  - type: web
+    name: vardhan-emr
+    env: node
+    plan: starter         # $7/month — includes persistent disk + no sleep
+    buildCommand: npm run build
+    startCommand: node server.cjs
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_PATH
+        value: /data/nexacare-server.db
+    disk:
+      name: emr-database
+      mountPath: /data
+      sizeGB: 1

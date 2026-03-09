@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Settings as SettingsIcon, Save, Database, Download, Upload, Shield, CheckCircle, AlertTriangle, Wifi, Monitor, Smartphone, Tablet, RefreshCw, Server, Trash2 } from 'lucide-react';
 import DatabaseService, { db } from '../services/database';
 import licenseService from '../services/licenseService';
+import { getServerUrl } from '../utils/serverUrl';
 
 function Settings() {
   const [settings, setSettings] = useState({
@@ -59,9 +60,9 @@ function Settings() {
     setLoading(false);
   };
 
-  // Dynamic: uses the same hostname the browser used to open the app.
-  // localhost:3000 → localhost:3001 | 192.168.1.131:3000 → 192.168.1.131:3001 | 1.22.20.11:3000 → 1.22.20.11:3001
-  const SYNC_SERVER = `http://${window.location.hostname}:3001`;
+  // Resolves to correct URL for any deployment:
+  // Cloud (HTTPS no port): same origin | Hospital (port 3000): hostname:3001
+  const SYNC_SERVER = getServerUrl();
 
   const checkServerStatus = async () => {
     const url = SYNC_SERVER;
