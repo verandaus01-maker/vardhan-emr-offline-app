@@ -1,0 +1,21 @@
+# Railway.app deployment — NexaCare Pro / Vardhan Hospital EMR
+# Docs: https://docs.railway.app/reference/config-as-code
+#
+# SETUP (one time):
+# 1. Go to https://railway.app → New Project → Deploy from GitHub
+# 2. Connect this repo → Railway auto-detects this file
+# 3. Add a Volume: Railway dashboard → your service → Volumes → Add Volume
+#    Mount path: /data   (stores the SQLite database permanently)
+# 4. Set environment variable:  DATABASE_PATH = /data/nexacare-server.db
+# 5. Deploy — get a permanent public URL (e.g. https://vardhan-emr.railway.app)
+# 6. ALL devices (hospital + Hyderabad) use that one URL
+
+[build]
+buildCommand = "npm run build"
+
+[deploy]
+startCommand = "node server.cjs"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 60
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
