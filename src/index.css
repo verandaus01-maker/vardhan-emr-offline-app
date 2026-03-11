@@ -67,8 +67,12 @@
     body.rx-print-mode .print-only {
       display: block !important;
       visibility: visible !important;
-      position: fixed !important;
-      top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
+      /* CRITICAL: must be absolute NOT fixed.
+         position:fixed elements repeat on every printed page in all browsers —
+         that caused the hospital header border to appear as a line at the top
+         of page 2, and the same top padding to apply on every page. */
+      position: absolute !important;
+      top: 0 !important; left: 0 !important; right: 0 !important; bottom: auto !important;
       background: white !important;
       z-index: 99999 !important;
       padding: 24px 32px !important;
@@ -102,7 +106,7 @@
       max-width: 100% !important;
     }
 
-    /* Prescription container */
+    /* Prescription container (used by standalone lab/report pages, not the overlay) */
     .prescription-container {
       /* Top margin for letterhead (70mm = ~2.75 inches) */
       margin-top: 70mm;
@@ -111,8 +115,14 @@
       /* Side margins */
       margin-left: 15mm;
       margin-right: 15mm;
-      /* Ensure single page */
-      page-break-inside: avoid;
+      /* NOTE: no page-break-inside here — that wrongly forced all content to one page */
+    }
+
+    /* Keep every table row together — prevents a test name printing on one page
+       while its value prints on the next (e.g. BNP row split). */
+    tbody tr {
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
     }
 
     /* Remove all shadows, rounded corners, gradients (waste ink) */
