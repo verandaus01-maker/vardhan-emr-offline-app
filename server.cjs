@@ -618,11 +618,23 @@ const DIST_PATH = path.join(__dirname, 'dist');
 const APP_PORT = 3000;
 
 if (fs.existsSync(DIST_PATH)) {
-  // Always serve React app from the MAIN port (PORT/3001).
-  // This makes cloud deployment (Railway/Render single-port) work out of the box.
-  app.use(express.static(DIST_PATH, { maxAge: '1d', etag: true }));
+  // Serve static assets (JS/CSS with content hashes) with 1-day cache.
+  // index.html must NEVER be cached — it references hashed filenames, so if
+  // the browser caches index.html it will miss new JS/CSS after a rebuild.
+  app.use(express.static(DIST_PATH, {
+    setHeaders(res, filePath) {
+      if (filePath.endsWith('index.html')) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+      } else {
+        res.setHeader('Cache-Control', 'public, max-age=86400'); // 1 day for hashed assets
+      }
+    },
+  }));
   // SPA fallback: all non-/api/* routes return index.html
   app.get(/^(?!\/api\/).*/, (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.sendFile(path.join(DIST_PATH, 'index.html'));
   });
 
@@ -631,8 +643,19 @@ if (fs.existsSync(DIST_PATH)) {
   if (!IS_CLOUD) {
     const appExpress = require('express')();
     appExpress.use(require('cors')({ origin: '*' }));
-    appExpress.use(express.static(DIST_PATH));
-    appExpress.get('*', (req, res) => res.sendFile(path.join(DIST_PATH, 'index.html')));
+    appExpress.use(express.static(DIST_PATH, {
+      setHeaders(res, filePath) {
+        if (filePath.endsWith('index.html')) {
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        } else {
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+        }
+      },
+    }));
+    appExpress.get('*', (req, res) => {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.sendFile(path.join(DIST_PATH, 'index.html'));
+    });
     appExpress.listen(APP_PORT, '0.0.0.0', () => {
       console.log(`  App server (local):  http://0.0.0.0:${APP_PORT}`);
     });
