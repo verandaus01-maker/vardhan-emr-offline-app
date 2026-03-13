@@ -48,11 +48,9 @@ echo  ================================================
 echo   Server starting...
 echo.
 echo   Open Chrome and go to:
-echo   http://localhost:3000
+echo   http://1.22.20.11:3000
 echo.
-echo   Other devices on hospital Wi-Fi:
-echo   Find this PC's IP (run: ipconfig) then open
-echo   http://YOUR_IP:3000  in Chrome
+echo   API Server:  http://1.22.20.11:3001
 echo  ================================================
 echo.
 echo   Keep this window open while using the app.
