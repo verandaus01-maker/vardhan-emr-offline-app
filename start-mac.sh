@@ -3,6 +3,9 @@
 #  NexaCare Pro — Mac Startup Script
 #  Vardhan Hospital EMR System
 #  Usage: bash start-mac.sh
+#
+#  Uses PM2 to keep the server running in the background.
+#  Server survives Terminal close and auto-restarts on crash.
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -e
@@ -30,6 +33,13 @@ fi
 NODE_VER=$(node -v)
 echo -e "${GREEN}✓ Node.js $NODE_VER${NC}"
 
+# Install PM2 globally if not present
+if ! command -v pm2 &> /dev/null; then
+  echo -e "${YELLOW}► Installing PM2 (process manager)...${NC}"
+  npm install -g pm2
+fi
+echo -e "${GREEN}✓ PM2 $(pm2 -v) ready${NC}"
+
 # Check npm dependencies
 if [ ! -d "node_modules" ]; then
   echo -e "${YELLOW}► Installing dependencies...${NC}"
@@ -41,22 +51,37 @@ echo ""
 echo -e "${YELLOW}► Building production app...${NC}"
 npm run build
 
+# Create logs directory
+mkdir -p logs
+
+# Stop existing PM2 process if running, then restart fresh
 echo ""
-echo -e "${YELLOW}► Starting servers...${NC}"
+echo -e "${YELLOW}► Starting server with PM2...${NC}"
+pm2 delete nexacare 2>/dev/null || true
+pm2 start ecosystem.config.cjs
+pm2 save
 
 # Get local IP address (works on macOS)
 LOCAL_IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || echo "127.0.0.1")
 
 echo ""
 echo -e "${GREEN}════════════════════════════════════════════════${NC}"
-echo -e "${GREEN}  App (React UI):  http://$LOCAL_IP:3000${NC}"
-echo -e "${GREEN}  API Server:      http://$LOCAL_IP:3001${NC}"
-echo ""
-echo -e "  Doctor's Mac:   Open Chrome → http://$LOCAL_IP:3000${NC}"
+echo -e "${GREEN}  ✓ Server running in background (PM2)          ${NC}"
+echo -e "${GREEN}                                                ${NC}"
+echo -e "${GREEN}  App (React UI):  http://$LOCAL_IP:3000        ${NC}"
+echo -e "${GREEN}  API Server:      http://$LOCAL_IP:3001        ${NC}"
+echo -e "${GREEN}                                                ${NC}"
+echo -e "  Doctor's Mac:   Open Chrome → ${BLUE}http://$LOCAL_IP:3000${NC}"
 echo -e "${GREEN}════════════════════════════════════════════════${NC}"
 echo ""
-echo -e "  Press ${RED}Ctrl+C${NC} to stop the servers"
+echo -e "  Server keeps running even after you close this Terminal."
 echo ""
-
-# Start the server (runs both ports)
-node server.cjs
+echo -e "  Useful commands:"
+echo -e "    ${YELLOW}pm2 status${NC}           — check if server is running"
+echo -e "    ${YELLOW}pm2 logs nexacare${NC}    — view live server logs"
+echo -e "    ${YELLOW}pm2 restart nexacare${NC} — restart after a code update"
+echo -e "    ${YELLOW}pm2 stop nexacare${NC}    — stop the server"
+echo ""
+echo -e "  To auto-start on Mac reboot (run once):"
+echo -e "    ${YELLOW}pm2 startup${NC}  ← run the command it prints"
+echo ""
