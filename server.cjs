@@ -664,6 +664,29 @@ if (fs.existsSync(DIST_PATH)) {
   console.log(`  ⚠️  dist/ folder not found — run "npm run build" first`);
 }
 
+// ─── Remote update endpoint (called from Hyderabad to push new code to hospital) ──
+const { execSync, exec } = require('child_process');
+const UPDATE_SECRET = process.env.UPDATE_SECRET || 'VardhanUpdate2025!';
+
+app.post('/api/admin/update', (req, res) => {
+  const { secret } = req.body;
+  if (secret !== UPDATE_SECRET) {
+    return res.status(403).json({ error: 'Unauthorized' });
+  }
+  res.json({ success: true, message: 'Pulling latest code and rebuilding. Server will restart in ~30 seconds.' });
+  // Trigger update in background; process.exit causes start.bat loop to restart with new code
+  setTimeout(() => {
+    exec('git pull && npm run build', { cwd: __dirname }, (err, stdout, stderr) => {
+      if (err) {
+        console.error('Update failed:', stderr);
+      } else {
+        console.log('Update successful. Restarting...');
+        process.exit(0); // start.bat restart loop picks this up
+      }
+    });
+  }, 500);
+});
+
 // ─── Start ───────────────────────────────────────────────────────────────────
 app.listen(PORT, '0.0.0.0', () => {
   console.log('');
@@ -681,3 +704,21 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log('═══════════════════════════════════════════════════════');
   console.log('');
 });
+
+// ─── Port 80: combined React + API for mobile network access ─────────────────
+// Port 80 is standard HTTP — NEVER blocked by mobile ISPs or firewalls.
+// http://1.22.20.11 (no port number) works on WiFi, 4G, 5G, any network.
+// serverUrl.js already handles port 80 correctly (returns same origin for API calls).
+if (!IS_CLOUD) {
+  app.listen(80, '0.0.0.0', () => {
+    console.log('  ✅ PRIMARY URL (all networks):  http://1.22.20.11');
+    console.log('     Works on WiFi + mobile data (4G/5G)');
+    console.log('');
+  }).on('error', (e) => {
+    if (e.code === 'EACCES') {
+      console.log('  ⚠️  Port 80 blocked — run start.bat as Administrator for mobile access');
+    } else if (e.code !== 'EADDRINUSE') {
+      console.log('  ⚠️  Port 80 error:', e.message);
+    }
+  });
+}
