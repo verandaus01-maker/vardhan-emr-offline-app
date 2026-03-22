@@ -68,19 +68,14 @@ if (-not (Test-Path "dist")) {
     }
 }
 
-# --- Get local IP ---
-$localIP = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notmatch "^127\." -and $_.PrefixOrigin -ne "WellKnown" } | Select-Object -First 1).IPAddress
-if (-not $localIP) { $localIP = "THIS-PC-IP" }
-
 Write-Host ""
 Write-Host "  ============================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "    HOSPITAL STAFF - Open Chrome and go to:" -ForegroundColor White
 Write-Host ""
-Write-Host "    http://$localIP" -ForegroundColor Yellow -BackgroundColor DarkBlue
+Write-Host "    http://1.22.20.11" -ForegroundColor Yellow -BackgroundColor DarkBlue
 Write-Host ""
 Write-Host "    Works on hospital WiFi AND mobile data (4G/5G)" -ForegroundColor Green
-Write-Host "    (Also works: http://$($localIP):3000 )" -ForegroundColor Gray
 Write-Host ""
 Write-Host "    Keep this window open. Ctrl+C to stop." -ForegroundColor White
 Write-Host ""
