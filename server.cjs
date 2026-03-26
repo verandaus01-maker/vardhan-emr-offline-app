@@ -13,8 +13,22 @@ const bcrypt = require('bcryptjs');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
-const HOSPITAL_IP = '1.22.20.11'; // Vardhan Hospital static IP
+// Detect the local LAN IP (e.g. 192.168.1.131) for display in startup messages.
+// Server always listens on 0.0.0.0 so every network interface is reachable.
+function getLanIp() {
+  const ifaces = os.networkInterfaces();
+  for (const name of Object.keys(ifaces)) {
+    for (const iface of ifaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        return iface.address;
+      }
+    }
+  }
+  return 'this-PC';
+}
+const LAN_IP = getLanIp();
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001');
@@ -700,34 +714,35 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log('  URL:  set by Railway/Render (check dashboard)');
   } else {
     console.log('  Mode: LOCAL HOSPITAL');
-    console.log(`  App (React):  http://${HOSPITAL_IP}:${APP_PORT}`);
-    console.log(`  API server:   http://${HOSPITAL_IP}:${PORT}`);
+    console.log(`  LAN IP: ${LAN_IP}`);
+    console.log(`  App (React):  http://${LAN_IP}:${APP_PORT}`);
+    console.log(`  API server:   http://${LAN_IP}:${PORT}`);
   }
   console.log('═══════════════════════════════════════════════════════');
   console.log('');
 });
 
 // ─── Port 80: combined React + API for all hospital devices ──────────────────
-// Port 80 is standard HTTP — no port number needed in the URL.
-// http://1.22.20.11 works on hospital WiFi from any device (laptop, tablet, phone).
+// Port 80 = no port number needed in URL. All devices on WiFi use http://LAN_IP
 // serverUrl.js returns same-origin for port 80 so API calls route correctly.
 if (!IS_CLOUD) {
   app.listen(80, '0.0.0.0', () => {
     console.log('');
-    console.log('  ╔══════════════════════════════════════════════════════╗');
-    console.log('  ║   HOSPITAL STAFF — open Chrome and go to:           ║');
-    console.log('  ║                                                      ║');
-    console.log(`  ║       http://${HOSPITAL_IP}                         ║`);
-    console.log('  ║                                                      ║');
-    console.log('  ║   Works on ALL devices connected to hospital WiFi   ║');
-    console.log('  ╚══════════════════════════════════════════════════════╝');
+    console.log('  ============================================');
+    console.log('  HOSPITAL STAFF - Open Chrome and go to:');
+    console.log('');
+    console.log(`  PRIMARY:   http://${LAN_IP}`);
+    console.log(`  FALLBACK:  http://${LAN_IP}:3000`);
+    console.log('');
+    console.log('  Works on ALL devices on hospital WiFi');
+    console.log('  ============================================');
     console.log('');
   }).on('error', (e) => {
     if (e.code === 'EACCES') {
-      console.log('  ⚠️  Port 80 needs Administrator — run start.bat as Admin');
-      console.log(`  ℹ️  Devices can also use http://${HOSPITAL_IP}:3000`);
+      console.log('  WARNING: Port 80 needs Administrator - run start.bat as Admin');
+      console.log(`  Devices can use http://${LAN_IP}:3000 in the meantime`);
     } else if (e.code !== 'EADDRINUSE') {
-      console.log('  ⚠️  Port 80 error:', e.message);
+      console.log('  Port 80 error:', e.message);
     }
   });
 }
