@@ -68,20 +68,13 @@ if (-not (Test-Path "dist")) {
     }
 }
 
-# --- Detect LAN IP ---
-$lanIp = (Get-NetIPAddress -AddressFamily IPv4 |
-    Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' } |
-    Sort-Object -Property PrefixLength -Descending |
-    Select-Object -First 1).IPAddress
-if (-not $lanIp) { $lanIp = "THIS-PC" }
-
 Write-Host ""
 Write-Host "  ╔══════════════════════════════════════════════════╗" -ForegroundColor Cyan
 Write-Host "  ║   HOSPITAL STAFF — Open Chrome and go to:       ║" -ForegroundColor Cyan
 Write-Host "  ║                                                  ║" -ForegroundColor Cyan
-Write-Host "  ║   http://$lanIp" -ForegroundColor Yellow
+Write-Host "  ║       http://1.22.20.11                         ║" -ForegroundColor Yellow
 Write-Host "  ║                                                  ║" -ForegroundColor Cyan
-Write-Host "  ║   Works on any device on hospital WiFi           ║" -ForegroundColor Cyan
+Write-Host "  ║   Works on ALL devices on hospital WiFi         ║" -ForegroundColor Cyan
 Write-Host "  ║   Keep this window open. Ctrl+C to stop.        ║" -ForegroundColor Cyan
 Write-Host "  ╚══════════════════════════════════════════════════╝" -ForegroundColor Cyan
 Write-Host ""
