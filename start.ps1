@@ -68,18 +68,22 @@ if (-not (Test-Path "dist")) {
     }
 }
 
+# --- Detect LAN IP ---
+$lanIp = (Get-NetIPAddress -AddressFamily IPv4 |
+    Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' } |
+    Sort-Object -Property PrefixLength -Descending |
+    Select-Object -First 1).IPAddress
+if (-not $lanIp) { $lanIp = "THIS-PC" }
+
 Write-Host ""
-Write-Host "  ============================================" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "    HOSPITAL STAFF - Open Chrome and go to:" -ForegroundColor White
-Write-Host ""
-Write-Host "    http://1.22.20.11" -ForegroundColor Yellow -BackgroundColor DarkBlue
-Write-Host ""
-Write-Host "    Works on hospital WiFi AND mobile data (4G/5G)" -ForegroundColor Green
-Write-Host ""
-Write-Host "    Keep this window open. Ctrl+C to stop." -ForegroundColor White
-Write-Host ""
-Write-Host "  ============================================" -ForegroundColor Cyan
+Write-Host "  ╔══════════════════════════════════════════════════╗" -ForegroundColor Cyan
+Write-Host "  ║   HOSPITAL STAFF — Open Chrome and go to:       ║" -ForegroundColor Cyan
+Write-Host "  ║                                                  ║" -ForegroundColor Cyan
+Write-Host "  ║   http://$lanIp" -ForegroundColor Yellow
+Write-Host "  ║                                                  ║" -ForegroundColor Cyan
+Write-Host "  ║   Works on any device on hospital WiFi           ║" -ForegroundColor Cyan
+Write-Host "  ║   Keep this window open. Ctrl+C to stop.        ║" -ForegroundColor Cyan
+Write-Host "  ╚══════════════════════════════════════════════════╝" -ForegroundColor Cyan
 Write-Host ""
 
 # --- Restart loop: pull updates from GitHub on every restart ---

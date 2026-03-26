@@ -13,6 +13,21 @@ const bcrypt = require('bcryptjs');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
+
+// ─── Detect local LAN IP ─────────────────────────────────────────────────────
+function getLanIp() {
+  const ifaces = os.networkInterfaces();
+  for (const name of Object.keys(ifaces)) {
+    for (const iface of ifaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        return iface.address;
+      }
+    }
+  }
+  return '127.0.0.1';
+}
+const LAN_IP = getLanIp();
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001');
@@ -698,8 +713,9 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log('  URL:  set by Railway/Render (check dashboard)');
   } else {
     console.log('  Mode: LOCAL HOSPITAL');
-    console.log(`  App (React):  http://0.0.0.0:${APP_PORT}  → http://1.22.20.11:3000`);
-    console.log(`  API server:   http://0.0.0.0:${PORT}  → http://1.22.20.11:3001`);
+    console.log(`  LAN IP detected: ${LAN_IP}`);
+    console.log(`  App (React):  http://${LAN_IP}:${APP_PORT}`);
+    console.log(`  API server:   http://${LAN_IP}:${PORT}`);
   }
   console.log('═══════════════════════════════════════════════════════');
   console.log('');
@@ -707,16 +723,23 @@ app.listen(PORT, '0.0.0.0', () => {
 
 // ─── Port 80: combined React + API for mobile network access ─────────────────
 // Port 80 is standard HTTP — NEVER blocked by mobile ISPs or firewalls.
-// http://1.22.20.11 (no port number) works on WiFi, 4G, 5G, any network.
+// http://<LAN_IP> (no port number) works on WiFi, 4G, 5G, any network.
 // serverUrl.js already handles port 80 correctly (returns same origin for API calls).
 if (!IS_CLOUD) {
   app.listen(80, '0.0.0.0', () => {
-    console.log('  ✅ PRIMARY URL (all networks):  http://1.22.20.11');
-    console.log('     Works on WiFi + mobile data (4G/5G)');
+    console.log('');
+    console.log('  ╔══════════════════════════════════════════════════════╗');
+    console.log('  ║   HOSPITAL STAFF — open Chrome and go to:           ║');
+    console.log('  ║                                                      ║');
+    console.log(`  ║   http://${LAN_IP.padEnd(42)}║`);
+    console.log('  ║                                                      ║');
+    console.log('  ║   Works on any device connected to hospital WiFi    ║');
+    console.log('  ╚══════════════════════════════════════════════════════╝');
     console.log('');
   }).on('error', (e) => {
     if (e.code === 'EACCES') {
       console.log('  ⚠️  Port 80 blocked — run start.bat as Administrator for mobile access');
+      console.log(`  ℹ️  Devices can still use http://${LAN_IP}:3000`);
     } else if (e.code !== 'EADDRINUSE') {
       console.log('  ⚠️  Port 80 error:', e.message);
     }
