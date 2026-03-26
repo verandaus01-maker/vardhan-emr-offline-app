@@ -104,7 +104,8 @@ db.exec(`
     nextVisit   TEXT,
     createdAt   TEXT,
     updatedAt   TEXT,
-    syncStatus  TEXT DEFAULT 'synced'
+    syncStatus  TEXT DEFAULT 'synced',
+    status      TEXT DEFAULT 'doctor_complete'
   );
 
   CREATE TABLE IF NOT EXISTS vitals (
@@ -160,6 +161,11 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_appointments_date   ON appointments(date);
   CREATE INDEX IF NOT EXISTS idx_labreports_pid      ON labReports(patientId);
 `);
+
+// Migrate existing databases: add status column if it doesn't exist yet
+try {
+  db.prepare("ALTER TABLE prescriptions ADD COLUMN status TEXT DEFAULT 'doctor_complete'").run();
+} catch (e) { /* column already exists — ignore */ }
 
 // Create default admin if no users exist
 const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get().c;

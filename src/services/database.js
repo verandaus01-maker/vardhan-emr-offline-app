@@ -45,6 +45,12 @@ db.version(4).stores({
   dailyStats: '++id, date, doctorId, totalPatients, totalPrescriptions, [date+doctorId]'
 });
 
+// Version 5: Add status index to prescriptions for 2-stage workflow
+// status: 'staff_draft' (filled by staff, awaiting doctor) | 'doctor_complete' (doctor finished)
+db.version(5).stores({
+  prescriptions: '++id, patientId, uhid, date, doctorId, diagnosis, status, syncStatus, createdAt, updatedAt'
+});
+
 // Database helper functions
 export class DatabaseService {
   // Expose db instance for direct access
@@ -180,6 +186,33 @@ export class DatabaseService {
       return { ...prescription, medications };
     }
     return null;
+  }
+
+  static async updatePrescription(id, updates) {
+    const updated = {
+      ...updates,
+      updatedAt: new Date().toISOString(),
+      syncStatus: 'pending'
+    };
+    await db.prescriptions.update(id, updated);
+    // Replace medications if provided
+    if (updates.medications !== undefined) {
+      await db.medications.where('prescriptionId').equals(id).delete();
+      if (updates.medications.length > 0) {
+        const prescription = await db.prescriptions.get(id);
+        await Promise.all(
+          updates.medications.map(med =>
+            db.medications.add({
+              ...med,
+              prescriptionId: id,
+              patientId: prescription?.patientId,
+              createdAt: new Date().toISOString()
+            })
+          )
+        );
+      }
+    }
+    await this.addToSyncQueue('prescriptions', 'update', { id, ...updated });
   }
 
   // Vitals operations
