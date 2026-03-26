@@ -38,3 +38,8 @@ pnpm-debug.log*
 
 # OS
 Thumbs.db
+
+# SQLite database files (generated at runtime)
+*.db
+*.db-shm
+*.db-wal
