@@ -652,7 +652,7 @@ if (fs.existsSync(DIST_PATH)) {
         }
       },
     }));
-    appExpress.get('*', (req, res) => {
+    appExpress.get('/{*path}', (req, res) => {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.sendFile(path.join(DIST_PATH, 'index.html'));
     });
