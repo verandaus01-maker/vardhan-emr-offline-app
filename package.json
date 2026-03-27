@@ -9,7 +9,10 @@
     "preview": "vite preview",
     "serve": "vite preview --port 3000 --host",
     "start": "node server.cjs",
-    "start:fresh": "npm run build && node server.cjs"
+    "start:fresh": "npm run build && node server.cjs",
+    "cap:sync": "npm run build && npx cap sync",
+    "cap:android": "npx cap open android",
+    "cap:ios": "npx cap open ios"
   },
   "repository": {
     "type": "git",
@@ -42,6 +45,11 @@
     "workbox-window": "^7.3.0"
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.0",
+    "@capacitor/cli": "^8.3.0",
+    "@capacitor/core": "^8.3.0",
+    "@capacitor/ios": "^8.3.0",
+    "@capacitor/preferences": "^8.0.1",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.6.2",
     "cors": "^2.8.6",
