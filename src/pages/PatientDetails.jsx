@@ -347,15 +347,15 @@ function PatientDetails() {
         </div>
       </div>
 
-      {/* Quick Action Buttons — write-access only */}
-      {authService.canWrite() && (
+      {/* Quick Action Buttons — all authenticated users */}
+      {authService.isAuthenticated && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <button
             onClick={() => navigate(`/prescription/${patientId}`)}
             className="btn-primary flex items-center justify-center space-x-3 py-6 text-lg"
           >
             <FileText className="w-6 h-6" />
-            <span>New Prescription</span>
+            <span>{authService.canWrite() ? 'New Prescription' : 'Start Patient Form'}</span>
           </button>
           <button
             onClick={() => navigate(`/vitals/${patientId}`)}
@@ -550,25 +550,54 @@ function PatientDetails() {
                 const meds = parseMedications(prescription.medications);
                 const isExpanded = expandedPrescription === prescription.id;
 
+                const isDraft = prescription.status === 'staff_draft';
+                const isDoctor = authService.canWrite();
+
                 return (
-                  <div key={prescription.id} className="card hover:shadow-lg transition">
+                  <div key={prescription.id} className={`card hover:shadow-lg transition ${isDraft ? 'border-2 border-orange-300' : ''}`}>
                     <div
                       className="cursor-pointer"
                       onClick={() => setExpandedPrescription(isExpanded ? null : prescription.id)}
                     >
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center space-x-3">
-                          <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                            <Stethoscope className="w-6 h-6 text-blue-600" />
+                          <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isDraft ? 'bg-orange-100' : 'bg-blue-100'}`}>
+                            <Stethoscope className={`w-6 h-6 ${isDraft ? 'text-orange-600' : 'text-blue-600'}`} />
                           </div>
                           <div>
-                            <p className="font-bold text-lg text-gray-800">
-                              {format(new Date(prescription.createdAt), 'dd MMM yyyy, hh:mm a')}
-                            </p>
-                            <p className="text-sm text-gray-500">Dr. Vivek Raj Singh</p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-bold text-lg text-gray-800">
+                                {format(new Date(prescription.createdAt), 'dd MMM yyyy, hh:mm a')}
+                              </p>
+                              {isDraft && (
+                                <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-semibold rounded-full border border-orange-300">
+                                  Pending Doctor
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-500">{isDraft ? 'Filled by Staff — Awaiting Dr. Vivek' : 'Dr. Vivek Raj Singh'}</p>
                           </div>
                         </div>
                         <div className="flex items-center space-x-2">
+                          {isDraft && isDoctor && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); navigate(`/prescription/${patientId}/${prescription.id}`); }}
+                              className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg transition"
+                              title="Open and complete this prescription"
+                            >
+                              Complete Prescription
+                            </button>
+                          )}
+                          {isDraft && !isDoctor && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); navigate(`/prescription/${patientId}/${prescription.id}`); }}
+                              className="px-3 py-1.5 bg-orange-100 hover:bg-orange-200 text-orange-700 text-sm font-semibold rounded-lg transition"
+                              title="Edit this draft"
+                            >
+                              Edit Draft
+                            </button>
+                          )}
+                          {!isDraft && (
                           <button
                             onClick={(e) => { e.stopPropagation(); handlePrintPrescription(prescription); }}
                             className="p-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition"
@@ -576,6 +605,7 @@ function PatientDetails() {
                           >
                             <Printer className="w-5 h-5" />
                           </button>
+                          )}
                           {isExpanded ? (
                             <ChevronUp className="w-6 h-6 text-gray-400" />
                           ) : (

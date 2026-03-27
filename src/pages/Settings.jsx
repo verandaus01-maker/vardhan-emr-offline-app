@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Settings as SettingsIcon, Save, Database, Download, Upload, Shield, CheckCircle, AlertTriangle, Wifi, Monitor, Smartphone, Tablet, RefreshCw, Server, Trash2 } from 'lucide-react';
 import DatabaseService, { db } from '../services/database';
 import licenseService from '../services/licenseService';
-import { getServerUrl } from '../utils/serverUrl';
+import { getServerUrl, getNativeServerUrl, setNativeServerUrl, isNativeApp } from '../utils/serverUrl';
 
 function Settings() {
   const [settings, setSettings] = useState({
@@ -30,10 +30,12 @@ function Settings() {
   const [serverStatus, setServerStatus] = useState(null);
   const [dedupStatus, setDedupStatus] = useState(null);
   const [serverDedupStatus, setServerDedupStatus] = useState(null);
+  const [nativeServerUrl, setNativeServerUrlState] = useState('');
 
   useEffect(() => {
     loadSettings();
     loadLicense();
+    setNativeServerUrlState(getNativeServerUrl());
   }, []);
 
   const loadLicense = () => {
@@ -306,6 +308,7 @@ function Settings() {
       for (const [key, value] of Object.entries(settings)) {
         await DatabaseService.setSetting(key, value.toString());
       }
+      setNativeServerUrl(nativeServerUrl);
       alert('✅ Settings saved successfully!');
     } catch (error) {
       console.error('Failed to save settings:', error);
@@ -915,6 +918,37 @@ function Settings() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Mobile App (Android / iOS) Server URL */}
+      <div className={`card border-l-4 ${isNativeApp() ? 'border-purple-500' : 'border-gray-300'}`}>
+        <h2 className="text-xl font-bold mb-1 flex items-center space-x-2">
+          <Smartphone className="w-6 h-6 text-purple-600" />
+          <span>Mobile App — Hospital Server URL</span>
+        </h2>
+        <p className="text-sm text-gray-600 mb-4">
+          {isNativeApp()
+            ? 'You are using the native mobile app. Enter the hospital server address so the app can sync data.'
+            : 'Set the server URL used by the Android / iOS native app when connecting to the hospital server.'}
+        </p>
+        <div>
+          <label className="label">Hospital Server URL</label>
+          <input
+            type="url"
+            value={nativeServerUrl}
+            onChange={(e) => setNativeServerUrlState(e.target.value)}
+            placeholder="http://1.22.20.11:3001"
+            className="input font-mono"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Use the hospital's public IP with port 3001 — e.g. <code className="bg-gray-100 rounded px-1">http://1.22.20.11:3001</code>. On hospital Wi-Fi you can also use the LAN IP e.g. <code className="bg-gray-100 rounded px-1">http://192.168.1.131:3001</code>.
+          </p>
+        </div>
+        {isNativeApp() && !nativeServerUrl && (
+          <div className="mt-3 p-3 bg-yellow-50 border border-yellow-300 rounded-lg text-sm text-yellow-800">
+            No server URL set. Using default: <strong>http://1.22.20.11:3001</strong>. Enter the correct URL above and tap Save Settings.
+          </div>
+        )}
       </div>
 
       {/* Save Button */}

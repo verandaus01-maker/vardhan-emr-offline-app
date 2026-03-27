@@ -4,7 +4,7 @@
 
 Set-Location -Path $PSScriptRoot
 
-# --- Require Admin (needed for port 80) ---
+# --- Require Admin (needed for port 80 and firewall) ---
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) {
     Write-Host "Requesting administrator privileges (needed for port 80)..." -ForegroundColor Yellow
@@ -68,29 +68,29 @@ if (-not (Test-Path "dist")) {
     }
 }
 
-# --- Get local IP ---
-$localIP = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notmatch "^127\." -and $_.PrefixOrigin -ne "WellKnown" } | Select-Object -First 1).IPAddress
-if (-not $localIP) { $localIP = "THIS-PC-IP" }
+# --- Get local LAN IP for display ---
+$lanIp = try {
+    (Get-NetIPAddress -AddressFamily IPv4 -ErrorAction Stop |
+        Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' } |
+        Select-Object -First 1).IPAddress
+} catch { "this-PC" }
 
 Write-Host ""
 Write-Host "  ============================================" -ForegroundColor Cyan
+Write-Host "   HOSPITAL STAFF - Open Chrome and go to:" -ForegroundColor White
 Write-Host ""
-Write-Host "    HOSPITAL STAFF - Open Chrome and go to:" -ForegroundColor White
+Write-Host "     http://$lanIp" -ForegroundColor Yellow
+Write-Host "     http://$lanIp`:3000  (if above fails)" -ForegroundColor Yellow
 Write-Host ""
-Write-Host "    http://$localIP" -ForegroundColor Yellow -BackgroundColor DarkBlue
-Write-Host ""
-Write-Host "    Works on hospital WiFi AND mobile data (4G/5G)" -ForegroundColor Green
-Write-Host "    (Also works: http://$($localIP):3000 )" -ForegroundColor Gray
-Write-Host ""
-Write-Host "    Keep this window open. Ctrl+C to stop." -ForegroundColor White
-Write-Host ""
+Write-Host "   Works on ALL devices on hospital WiFi" -ForegroundColor Green
+Write-Host "   Keep this window open. Ctrl+C to stop." -ForegroundColor White
 Write-Host "  ============================================" -ForegroundColor Cyan
 Write-Host ""
 
-# --- Restart loop: pull updates from GitHub on every restart ---
+# --- Restart loop: pull updates and run server ---
 while ($true) {
     if ($gitFound) {
-        Write-Host "  Checking for updates from Hyderabad..." -ForegroundColor Gray
+        Write-Host "  Checking for updates..." -ForegroundColor Gray
         $pullOutput = & git pull origin claude/verify-local-deployment-09Im8 2>&1
         if ($pullOutput -match "Updating|Fast-forward") {
             Write-Host "  New update found! Rebuilding..." -ForegroundColor Yellow

@@ -13,6 +13,22 @@ const bcrypt = require('bcryptjs');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
+
+// Detect the local LAN IP (e.g. 192.168.1.131) for display in startup messages.
+// Server always listens on 0.0.0.0 so every network interface is reachable.
+function getLanIp() {
+  const ifaces = os.networkInterfaces();
+  for (const name of Object.keys(ifaces)) {
+    for (const iface of ifaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        return iface.address;
+      }
+    }
+  }
+  return 'this-PC';
+}
+const LAN_IP = getLanIp();
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001');
@@ -88,7 +104,8 @@ db.exec(`
     nextVisit   TEXT,
     createdAt   TEXT,
     updatedAt   TEXT,
-    syncStatus  TEXT DEFAULT 'synced'
+    syncStatus  TEXT DEFAULT 'synced',
+    status      TEXT DEFAULT 'doctor_complete'
   );
 
   CREATE TABLE IF NOT EXISTS vitals (
@@ -144,6 +161,11 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_appointments_date   ON appointments(date);
   CREATE INDEX IF NOT EXISTS idx_labreports_pid      ON labReports(patientId);
 `);
+
+// Migrate existing databases: add status column if it doesn't exist yet
+try {
+  db.prepare("ALTER TABLE prescriptions ADD COLUMN status TEXT DEFAULT 'doctor_complete'").run();
+} catch (e) { /* column already exists — ignore */ }
 
 // Create default admin if no users exist
 const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get().c;
@@ -652,7 +674,7 @@ if (fs.existsSync(DIST_PATH)) {
         }
       },
     }));
-    appExpress.get('*', (req, res) => {
+    appExpress.get('/{*path}', (req, res) => {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.sendFile(path.join(DIST_PATH, 'index.html'));
     });
@@ -698,27 +720,35 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log('  URL:  set by Railway/Render (check dashboard)');
   } else {
     console.log('  Mode: LOCAL HOSPITAL');
-    console.log(`  App (React):  http://0.0.0.0:${APP_PORT}  → http://1.22.20.11:3000`);
-    console.log(`  API server:   http://0.0.0.0:${PORT}  → http://1.22.20.11:3001`);
+    console.log(`  LAN IP: ${LAN_IP}`);
+    console.log(`  App (React):  http://${LAN_IP}:${APP_PORT}`);
+    console.log(`  API server:   http://${LAN_IP}:${PORT}`);
   }
   console.log('═══════════════════════════════════════════════════════');
   console.log('');
 });
 
-// ─── Port 80: combined React + API for mobile network access ─────────────────
-// Port 80 is standard HTTP — NEVER blocked by mobile ISPs or firewalls.
-// http://1.22.20.11 (no port number) works on WiFi, 4G, 5G, any network.
-// serverUrl.js already handles port 80 correctly (returns same origin for API calls).
+// ─── Port 80: combined React + API for all hospital devices ──────────────────
+// Port 80 = no port number needed in URL. All devices on WiFi use http://LAN_IP
+// serverUrl.js returns same-origin for port 80 so API calls route correctly.
 if (!IS_CLOUD) {
   app.listen(80, '0.0.0.0', () => {
-    console.log('  ✅ PRIMARY URL (all networks):  http://1.22.20.11');
-    console.log('     Works on WiFi + mobile data (4G/5G)');
+    console.log('');
+    console.log('  ============================================');
+    console.log('  HOSPITAL STAFF - Open Chrome and go to:');
+    console.log('');
+    console.log(`  PRIMARY:   http://${LAN_IP}`);
+    console.log(`  FALLBACK:  http://${LAN_IP}:3000`);
+    console.log('');
+    console.log('  Works on ALL devices on hospital WiFi');
+    console.log('  ============================================');
     console.log('');
   }).on('error', (e) => {
     if (e.code === 'EACCES') {
-      console.log('  ⚠️  Port 80 blocked — run start.bat as Administrator for mobile access');
+      console.log('  WARNING: Port 80 needs Administrator - run start.bat as Admin');
+      console.log(`  Devices can use http://${LAN_IP}:3000 in the meantime`);
     } else if (e.code !== 'EADDRINUSE') {
-      console.log('  ⚠️  Port 80 error:', e.message);
+      console.log('  Port 80 error:', e.message);
     }
   });
 }

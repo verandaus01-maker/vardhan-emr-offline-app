@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, X, Save, Printer, Search } from 'lucide-react';
+import { ArrowLeft, Plus, X, Save, Printer, Search, Lock, CheckCircle } from 'lucide-react';
 import DatabaseService from '../services/database';
+import authService from '../services/authService';
 import { format } from 'date-fns';
 
 function PrescriptionWriter() {
-  const { patientId } = useParams();
+  const { patientId, prescriptionId } = useParams();
   const navigate = useNavigate();
+  const currentUser = authService.getCurrentUser();
+  const isDoctor = currentUser?.role === 'doctor' || currentUser?.role === 'admin';
   const [patient, setPatient] = useState(null);
+  const [existingPrescription, setExistingPrescription] = useState(null);
   const [formData, setFormData] = useState({
     complaints: '',
     notes: '',
@@ -353,6 +357,12 @@ function PrescriptionWriter() {
   }, [patientId]);
 
   useEffect(() => {
+    if (prescriptionId) {
+      loadExistingPrescription();
+    }
+  }, [prescriptionId]);
+
+  useEffect(() => {
     if (drugSearch.length >= 2) {
       searchDrugsLocal();
     } else {
@@ -367,6 +377,28 @@ function PrescriptionWriter() {
       return;
     }
     setPatient(patientData);
+  };
+
+  const loadExistingPrescription = async () => {
+    const rx = await DatabaseService.getPrescription(parseInt(prescriptionId));
+    if (!rx) return;
+    setExistingPrescription(rx);
+    // Pre-fill form with saved data
+    const parseJSON = (val, fallback) => {
+      if (!val) return fallback;
+      if (typeof val === 'object') return val;
+      try { return JSON.parse(val); } catch { return fallback; }
+    };
+    setFormData({
+      complaints: rx.complaints || '',
+      notes: rx.notes || '',
+      vitals: parseJSON(rx.vitals, { pulse: '', spo2: '', bp: '' }),
+      investigations: parseJSON(rx.investigations, formData.investigations),
+      diagnosis: rx.diagnosis || '',
+      medications: parseJSON(rx.medications, []),
+      advisedInvestigations: rx.advisedInvestigations || '',
+      nextVisit: rx.nextVisit || ''
+    });
   };
 
   const searchDrugsLocal = () => {
@@ -435,33 +467,67 @@ function PrescriptionWriter() {
   };
 
   const handleSave = async () => {
-    if (!formData.diagnosis) {
-      alert('Please enter diagnosis');
+    // Doctor must enter diagnosis before completing
+    if (isDoctor && !formData.diagnosis) {
+      alert('Please enter diagnosis before completing');
       return;
     }
 
     setSaving(true);
 
     try {
-      const prescriptionData = {
-        patientId: parseInt(patientId),
-        uhid: patient.uhid,
-        date: new Date().toISOString(),
-        doctorId: 1,
-        complaints: formData.complaints,
-        notes: formData.notes,
-        vitals: formData.vitals,
-        diagnosis: formData.diagnosis,
-        investigations: formData.investigations,
-        advisedInvestigations: formData.advisedInvestigations,
-        nextVisit: formData.nextVisit || '',
-        medications: formData.medications
-      };
+      const isDraft = existingPrescription?.status === 'staff_draft';
 
-      await DatabaseService.addPrescription(prescriptionData);
+      if (!isDoctor) {
+        // Stage 1 — staff saves a draft
+        const prescriptionData = {
+          patientId: parseInt(patientId),
+          uhid: patient.uhid,
+          date: new Date().toISOString(),
+          doctorId: null,
+          complaints: formData.complaints,
+          notes: formData.notes,
+          vitals: formData.vitals,
+          investigations: formData.investigations,
+          diagnosis: '',
+          advisedInvestigations: '',
+          nextVisit: '',
+          medications: [],
+          status: 'staff_draft'
+        };
+        if (existingPrescription) {
+          await DatabaseService.updatePrescription(existingPrescription.id, prescriptionData);
+        } else {
+          await DatabaseService.addPrescription(prescriptionData);
+        }
+        alert('✅ Saved! Waiting for Doctor to complete.');
+        navigate(`/patients/${patientId}`);
 
-      alert('✅ Prescription Saved!');
-      navigate(`/patients/${patientId}`);
+      } else {
+        // Stage 2 — doctor completes
+        const prescriptionData = {
+          patientId: parseInt(patientId),
+          uhid: patient.uhid,
+          date: existingPrescription?.date || new Date().toISOString(),
+          doctorId: currentUser?.id || 1,
+          complaints: formData.complaints,
+          notes: formData.notes,
+          vitals: formData.vitals,
+          diagnosis: formData.diagnosis,
+          investigations: formData.investigations,
+          advisedInvestigations: formData.advisedInvestigations,
+          nextVisit: formData.nextVisit || '',
+          medications: formData.medications,
+          status: 'doctor_complete'
+        };
+        if (existingPrescription) {
+          await DatabaseService.updatePrescription(existingPrescription.id, prescriptionData);
+        } else {
+          await DatabaseService.addPrescription(prescriptionData);
+        }
+        alert('✅ Prescription Complete!');
+        navigate(`/patients/${patientId}`);
+      }
 
     } catch (error) {
       console.error('Failed to save:', error);
@@ -482,6 +548,8 @@ function PrescriptionWriter() {
     );
   }
 
+  const isDraft = existingPrescription?.status === 'staff_draft';
+
   return (
     <div className="space-y-6 fade-in max-w-5xl mx-auto">
       {/* Controls */}
@@ -494,20 +562,42 @@ function PrescriptionWriter() {
           <span>Back to Patient</span>
         </button>
         <div className="flex items-center space-x-3">
-          <button onClick={handlePrint} className="btn-secondary flex items-center space-x-2">
-            <Printer className="w-5 h-5" />
-            <span>Print</span>
-          </button>
+          {isDoctor && (
+            <button onClick={handlePrint} className="btn-secondary flex items-center space-x-2">
+              <Printer className="w-5 h-5" />
+              <span>Print</span>
+            </button>
+          )}
           <button
             onClick={handleSave}
             disabled={saving}
             className="btn-primary flex items-center space-x-2"
           >
             <Save className="w-5 h-5" />
-            <span>{saving ? 'Saving...' : 'Save'}</span>
+            <span>{saving ? 'Saving...' : isDoctor ? (isDraft ? 'Complete & Save' : 'Save Prescription') : 'Save for Doctor'}</span>
           </button>
         </div>
       </div>
+
+      {/* Stage banner — screen only */}
+      {!isDoctor && (
+        <div className="no-print" style={{ background: '#fefce8', border: '1px solid #fbbf24', borderRadius: '8px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '20px' }}>📋</span>
+          <div>
+            <strong style={{ color: '#92400e' }}>Stage 1 — Staff Entry</strong>
+            <p style={{ color: '#78350f', margin: 0, fontSize: '13px' }}>Fill symptoms, vitals and pathology values. Doctor will complete diagnosis and medicines.</p>
+          </div>
+        </div>
+      )}
+      {isDoctor && isDraft && (
+        <div className="no-print" style={{ background: '#f0fdf4', border: '1px solid #22c55e', borderRadius: '8px', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <CheckCircle style={{ color: '#16a34a', width: '24px', height: '24px', flexShrink: 0 }} />
+          <div>
+            <strong style={{ color: '#166534' }}>Stage 2 — Doctor Completion</strong>
+            <p style={{ color: '#14532d', margin: 0, fontSize: '13px' }}>Patient details filled by staff are shown below (read-only). Please add Diagnosis, Medications and Advice.</p>
+          </div>
+        </div>
+      )}
 
       {/* Prescription Content */}
       <div style={{
@@ -566,13 +656,14 @@ function PrescriptionWriter() {
 
         {/* Symptoms */}
         <div className="no-print" style={{ marginBottom: '8px' }}>
-          <strong style={{ fontSize: '11pt' }}>Symptoms:</strong>
+          <strong style={{ fontSize: '11pt' }}>Symptoms: {isDoctor && isDraft && <span style={{ fontSize: '9pt', color: '#6b7280', fontWeight: 'normal' }}>(filled by staff)</span>}</strong>
           <textarea
             value={formData.complaints}
-            onChange={(e) => setFormData({ ...formData, complaints: e.target.value })}
+            onChange={(e) => !( isDoctor && isDraft) && setFormData({ ...formData, complaints: e.target.value })}
+            readOnly={isDoctor && isDraft}
             rows="2"
             placeholder="Generalised weakness, Chest pain"
-            style={{ width: '100%', fontSize: '10.5pt', padding: '4px 6px', border: '1px solid #ccc', borderRadius: '3px', marginTop: '3px' }}
+            style={{ width: '100%', fontSize: '10.5pt', padding: '4px 6px', border: '1px solid #ccc', borderRadius: '3px', marginTop: '3px', background: (isDoctor && isDraft) ? '#f9fafb' : 'white' }}
           />
         </div>
         {formData.complaints && (
@@ -583,13 +674,14 @@ function PrescriptionWriter() {
 
         {/* Notes */}
         <div className="no-print" style={{ marginBottom: '8px' }}>
-          <strong style={{ fontSize: '11pt' }}>Notes:</strong>
+          <strong style={{ fontSize: '11pt' }}>Notes: {isDoctor && isDraft && <span style={{ fontSize: '9pt', color: '#6b7280', fontWeight: 'normal' }}>(filled by staff)</span>}</strong>
           <textarea
             value={formData.notes}
-            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+            onChange={(e) => !(isDoctor && isDraft) && setFormData({ ...formData, notes: e.target.value })}
+            readOnly={isDoctor && isDraft}
             rows="2"
             placeholder="Clinical notes: Recently admitted with NSTEMI, ECHO—ICMP"
-            style={{ width: '100%', fontSize: '10.5pt', padding: '4px 6px', border: '1px solid #ccc', borderRadius: '3px', marginTop: '3px' }}
+            style={{ width: '100%', fontSize: '10.5pt', padding: '4px 6px', border: '1px solid #ccc', borderRadius: '3px', marginTop: '3px', background: (isDoctor && isDraft) ? '#f9fafb' : 'white' }}
           />
         </div>
         {formData.notes && (
@@ -600,11 +692,11 @@ function PrescriptionWriter() {
 
         {/* Vitals */}
         <div className="no-print" style={{ marginBottom: '8px' }}>
-          <strong style={{ fontSize: '11pt' }}>Vitals:</strong>
+          <strong style={{ fontSize: '11pt' }}>Vitals: {isDoctor && isDraft && <span style={{ fontSize: '9pt', color: '#6b7280', fontWeight: 'normal' }}>(filled by staff)</span>}</strong>
           <div style={{ display: 'flex', gap: '8px', marginTop: '3px' }}>
-            <input type="text" value={formData.vitals.pulse} onChange={(e) => setFormData({ ...formData, vitals: { ...formData.vitals, pulse: e.target.value }})} placeholder="Pulse: 70" style={{ flex: 1, fontSize: '10.5pt', padding: '4px 6px', border: '1px solid #ccc', borderRadius: '3px' }} />
-            <input type="text" value={formData.vitals.spo2} onChange={(e) => setFormData({ ...formData, vitals: { ...formData.vitals, spo2: e.target.value }})} placeholder="SPO2: 96" style={{ flex: 1, fontSize: '10.5pt', padding: '4px 6px', border: '1px solid #ccc', borderRadius: '3px' }} />
-            <input type="text" value={formData.vitals.bp} onChange={(e) => setFormData({ ...formData, vitals: { ...formData.vitals, bp: e.target.value }})} placeholder="BP: 110/80" style={{ flex: 1, fontSize: '10.5pt', padding: '4px 6px', border: '1px solid #ccc', borderRadius: '3px' }} />
+            <input type="text" value={formData.vitals.pulse} onChange={(e) => !(isDoctor && isDraft) && setFormData({ ...formData, vitals: { ...formData.vitals, pulse: e.target.value }})} readOnly={isDoctor && isDraft} placeholder="Pulse: 70" style={{ flex: 1, fontSize: '10.5pt', padding: '4px 6px', border: '1px solid #ccc', borderRadius: '3px', background: (isDoctor && isDraft) ? '#f9fafb' : 'white' }} />
+            <input type="text" value={formData.vitals.spo2} onChange={(e) => !(isDoctor && isDraft) && setFormData({ ...formData, vitals: { ...formData.vitals, spo2: e.target.value }})} readOnly={isDoctor && isDraft} placeholder="SPO2: 96" style={{ flex: 1, fontSize: '10.5pt', padding: '4px 6px', border: '1px solid #ccc', borderRadius: '3px', background: (isDoctor && isDraft) ? '#f9fafb' : 'white' }} />
+            <input type="text" value={formData.vitals.bp} onChange={(e) => !(isDoctor && isDraft) && setFormData({ ...formData, vitals: { ...formData.vitals, bp: e.target.value }})} readOnly={isDoctor && isDraft} placeholder="BP: 110/80" style={{ flex: 1, fontSize: '10.5pt', padding: '4px 6px', border: '1px solid #ccc', borderRadius: '3px', background: (isDoctor && isDraft) ? '#f9fafb' : 'white' }} />
           </div>
         </div>
         {(formData.vitals.pulse || formData.vitals.spo2 || formData.vitals.bp) && (
@@ -1065,19 +1157,37 @@ function PrescriptionWriter() {
           )}
         </div>
 
+        {/* Doctor section divider — shown when doctor is completing a staff draft */}
+        {isDoctor && isDraft && (
+          <div className="no-print" style={{ margin: '16px 0 12px', padding: '10px 14px', background: '#f0fdf4', border: '2px solid #22c55e', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Lock style={{ width: '18px', height: '18px', color: '#16a34a' }} />
+            <strong style={{ color: '#166534', fontSize: '11pt' }}>Dr. Vivek — Fill below (Diagnosis, Medicines, Advice)</strong>
+          </div>
+        )}
+
+        {/* Staff: hide diagnosis+medications. Doctor: always show */}
+        {!isDoctor && (
+          <div className="no-print" style={{ padding: '10px 14px', background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: '6px', marginBottom: '8px', fontSize: '12pt', color: '#92400e' }}>
+            <Lock style={{ width: '16px', height: '16px', display: 'inline', marginRight: '6px' }} />
+            <strong>Diagnosis, Medicines and Advice</strong> — to be filled by Dr. Vivek after you save.
+          </div>
+        )}
+
         {/* Diagnosis */}
+        {isDoctor && (
         <div className="no-print" style={{ marginBottom: '8px' }}>
           <strong style={{ fontSize: '11pt' }}>Diagnosis: *</strong>
           <input type="text" value={formData.diagnosis} onChange={(e) => setFormData({ ...formData, diagnosis: e.target.value })} placeholder="IHD/NSTEMI/Moderate LVD/SR/HTN" required style={{ width: '100%', fontSize: '10.5pt', padding: '4px 6px', border: '1px solid #ccc', borderRadius: '3px', marginTop: '3px' }} />
         </div>
+        )}
         {formData.diagnosis && (
           <div className="print-only" style={{ marginBottom: '6px', fontSize: '11pt' }}>
             <strong>Diagnosis:</strong> {formData.diagnosis}
           </div>
         )}
 
-        {/* ===== MEDICATIONS TABLE ===== */}
-        <div style={{ marginTop: '8px', marginBottom: '8px' }}>
+        {/* ===== MEDICATIONS TABLE — Doctor only ===== */}
+        {isDoctor && <div style={{ marginTop: '8px', marginBottom: '8px' }}>
 
           {/* ── SINGLE TABLE - inputs visible on screen, Hindi text always present ── */}
           {/* Print CSS hides inputs and shows translated divs via display:none / display:block */}
@@ -1248,19 +1358,23 @@ function PrescriptionWriter() {
             )}
           </div>
         </div>
+        } {/* end isDoctor medications block */}
 
-        {/* Advised Investigations */}
+        {/* Advised Investigations — Doctor only */}
+        {isDoctor && (
         <div className="no-print" style={{ marginBottom: '8px' }}>
           <strong style={{ fontSize: '11pt' }}>Advised Investigations:</strong>
           <input type="text" value={formData.advisedInvestigations} onChange={(e) => setFormData({ ...formData, advisedInvestigations: e.target.value })} placeholder="Exercise regularly, Avoid stress" style={{ width: '100%', fontSize: '10.5pt', padding: '4px 6px', border: '1px solid #ccc', borderRadius: '3px', marginTop: '3px' }} />
         </div>
+        )}
         {formData.advisedInvestigations && (
           <div className="print-only" style={{ marginBottom: '6px', fontSize: '11pt' }}>
             <strong>Advised Investigations:</strong> {formData.advisedInvestigations}
           </div>
         )}
 
-        {/* Next Visit */}
+        {/* Next Visit — Doctor only */}
+        {isDoctor && (
         <div className="no-print" style={{ marginBottom: '8px' }}>
           <strong style={{ fontSize: '11pt' }}>Next Visit:</strong>
           <input
@@ -1270,6 +1384,7 @@ function PrescriptionWriter() {
             style={{ fontSize: '10.5pt', padding: '4px 6px', border: '1px solid #ccc', borderRadius: '3px', marginTop: '3px', marginLeft: '8px' }}
           />
         </div>
+        )}
         {formData.nextVisit && (
           <div className="print-only" style={{ marginBottom: '6px', fontSize: '11pt' }}>
             <strong>Next Visit:</strong> {format(new Date(formData.nextVisit), 'dd-MM-yyyy')}
