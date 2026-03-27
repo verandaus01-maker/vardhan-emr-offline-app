@@ -554,15 +554,15 @@ function PatientDetails() {
                 const isDoctor = authService.canWrite();
 
                 return (
-                  <div key={prescription.id} className={`card hover:shadow-lg transition ${isDraft ? 'border-2 border-orange-300' : ''}`}>
+                  <div key={prescription.id} className={`card hover:shadow-lg transition ${isDraft ? 'border-2 border-orange-300' : 'border-2 border-green-300'}`}>
                     <div
                       className="cursor-pointer"
                       onClick={() => setExpandedPrescription(isExpanded ? null : prescription.id)}
                     >
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center space-x-3">
-                          <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isDraft ? 'bg-orange-100' : 'bg-blue-100'}`}>
-                            <Stethoscope className={`w-6 h-6 ${isDraft ? 'text-orange-600' : 'text-blue-600'}`} />
+                          <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isDraft ? 'bg-orange-100' : 'bg-green-100'}`}>
+                            <Stethoscope className={`w-6 h-6 ${isDraft ? 'text-orange-600' : 'text-green-600'}`} />
                           </div>
                           <div>
                             <div className="flex items-center gap-2">
@@ -600,7 +600,7 @@ function PatientDetails() {
                           {!isDraft && (
                           <button
                             onClick={(e) => { e.stopPropagation(); handlePrintPrescription(prescription); }}
-                            className="p-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition"
+                            className="p-2 bg-green-50 hover:bg-green-100 text-green-600 rounded-lg transition"
                             title="Print this prescription"
                           >
                             <Printer className="w-5 h-5" />
