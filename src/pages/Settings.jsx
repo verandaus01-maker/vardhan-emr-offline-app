@@ -165,13 +165,20 @@ function Settings() {
         if (!Array.isArray(rxList) || rxList.length === 0) break;
         for (const rx of rxList) {
           try {
-            // Dedup check: same uhid+createdAt means same prescription — skip it
+            // Dedup check: same uhid+createdAt means same prescription
             if (rx.createdAt && (rx.uhid || rx.patientId)) {
               const exists = await db.prescriptions
                 .where('createdAt').equals(rx.createdAt)
                 .filter(p => rx.uhid ? p.uhid === rx.uhid : p.patientId === rx.patientId)
                 .first();
-              if (exists) { skippedRx++; continue; }
+              if (exists) {
+                // Sync status update: if server has doctor_complete but local still shows staff_draft,
+                // update local so the doctor's completion is reflected everywhere
+                if (rx.status && rx.status !== exists.status && rx.status === 'doctor_complete') {
+                  await db.prescriptions.update(exists.id, { status: rx.status, syncStatus: 'synced' });
+                }
+                skippedRx++; continue;
+              }
             }
             await db.prescriptions.add({ ...rx, id: undefined, syncStatus: 'synced' });
             totalRx++;

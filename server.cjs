@@ -167,6 +167,18 @@ try {
   db.prepare("ALTER TABLE prescriptions ADD COLUMN status TEXT DEFAULT 'doctor_complete'").run();
 } catch (e) { /* column already exists — ignore */ }
 
+// Fix existing records that were wrongly defaulted to 'doctor_complete':
+// If a prescription has no diagnosis and no real medications, it was a staff draft
+try {
+  db.prepare(`
+    UPDATE prescriptions
+    SET status = 'staff_draft'
+    WHERE status = 'doctor_complete'
+      AND (diagnosis IS NULL OR diagnosis = '')
+      AND (medications IS NULL OR medications = '[]' OR medications = '')
+  `).run();
+} catch (e) { /* ignore */ }
+
 // Create default admin if no users exist
 const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get().c;
 if (userCount === 0) {
@@ -394,12 +406,13 @@ app.post('/api/prescriptions', (req, res) => {
   try {
     const p = req.body;
     const now = new Date().toISOString();
+    const status = p.status || (p.diagnosis ? 'doctor_complete' : 'staff_draft');
     const result = db.prepare(`
-      INSERT INTO prescriptions (patientId,uhid,date,doctorId,complaints,diagnosis,notes,medications,vitals,investigations,advisedInvestigations,advice,nextVisit,createdAt,updatedAt,syncStatus)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
+      INSERT INTO prescriptions (patientId,uhid,date,doctorId,complaints,diagnosis,notes,medications,vitals,investigations,advisedInvestigations,advice,nextVisit,status,createdAt,updatedAt,syncStatus)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
     `).run(p.patientId, p.uhid, p.date, p.doctorId||1, p.complaints||'', p.diagnosis||'', p.notes||'',
       JSON.stringify(p.medications||[]), JSON.stringify(p.vitals||{}), JSON.stringify(p.investigations||{}),
-      p.advisedInvestigations||'', p.advice||'', p.nextVisit||'', p.createdAt||now, p.updatedAt||now);
+      p.advisedInvestigations||'', p.advice||'', p.nextVisit||'', status, p.createdAt||now, p.updatedAt||now);
     res.json({ success: true, id: result.lastInsertRowid });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -411,16 +424,26 @@ app.post('/api/prescriptions/bulk', (req, res) => {
   if (!Array.isArray(prescriptions)) return res.status(400).json({ error: 'Expected array' });
   const now = new Date().toISOString();
   const insert = db.prepare(`
-    INSERT OR IGNORE INTO prescriptions (patientId,uhid,date,doctorId,complaints,diagnosis,notes,medications,vitals,investigations,advisedInvestigations,advice,nextVisit,createdAt,updatedAt,syncStatus)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
+    INSERT INTO prescriptions (patientId,uhid,date,doctorId,complaints,diagnosis,notes,medications,vitals,investigations,advisedInvestigations,advice,nextVisit,status,createdAt,updatedAt,syncStatus)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
+    ON CONFLICT DO NOTHING
+  `);
+  const upsertStatus = db.prepare(`
+    UPDATE prescriptions SET status=?, updatedAt=?, syncStatus='synced'
+    WHERE (uhid=? OR patientId=?) AND createdAt=?
   `);
   const insertMany = db.transaction((rows) => {
     let done = 0;
     for (const p of rows) {
       try {
-        insert.run(p.patientId, p.uhid, p.date, p.doctorId||1, p.complaints||'', p.diagnosis||'', p.notes||'',
+        const status = p.status || (p.diagnosis ? 'doctor_complete' : 'staff_draft');
+        const inserted = insert.run(p.patientId, p.uhid, p.date, p.doctorId||1, p.complaints||'', p.diagnosis||'', p.notes||'',
           JSON.stringify(p.medications||[]), JSON.stringify(p.vitals||{}), JSON.stringify(p.investigations||{}),
-          p.advisedInvestigations||'', p.advice||'', p.nextVisit||'', p.createdAt||now, p.updatedAt||now);
+          p.advisedInvestigations||'', p.advice||'', p.nextVisit||'', status, p.createdAt||now, p.updatedAt||now);
+        if (inserted.changes === 0 && p.createdAt && p.status) {
+          // Record already exists — update status in case it changed (e.g. doctor_complete)
+          upsertStatus.run(status, p.updatedAt||now, p.uhid||'', p.patientId||0, p.createdAt);
+        }
         done++;
       } catch (e) { /* skip */ }
     }
@@ -428,6 +451,26 @@ app.post('/api/prescriptions/bulk', (req, res) => {
   });
   const done = insertMany(prescriptions);
   res.json({ success: true, inserted: done });
+});
+
+app.put('/api/prescriptions/:id', (req, res) => {
+  try {
+    const p = req.body;
+    const now = new Date().toISOString();
+    const status = p.status || (p.diagnosis ? 'doctor_complete' : 'staff_draft');
+    db.prepare(`
+      UPDATE prescriptions SET
+        complaints=?, diagnosis=?, notes=?, medications=?, vitals=?, investigations=?,
+        advisedInvestigations=?, advice=?, nextVisit=?, status=?, updatedAt=?, syncStatus='synced'
+      WHERE id=?
+    `).run(p.complaints||'', p.diagnosis||'', p.notes||'',
+      JSON.stringify(p.medications||[]), JSON.stringify(p.vitals||{}), JSON.stringify(p.investigations||{}),
+      p.advisedInvestigations||'', p.advice||'', p.nextVisit||'', status, p.updatedAt||now,
+      req.params.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // ─── Vitals Routes ───────────────────────────────────────────────────────────
