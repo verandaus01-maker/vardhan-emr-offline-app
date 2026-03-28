@@ -738,19 +738,29 @@ app.post('/api/admin/update', (req, res) => {
   if (secret !== UPDATE_SECRET) {
     return res.status(403).json({ error: 'Unauthorized' });
   }
-  res.json({ success: true, message: 'Pulling latest code and rebuilding. Server will restart in ~30 seconds.' });
-  // Trigger update in background; process.exit causes start.bat loop to restart with new code
+  res.json({ success: true, message: 'Pulling latest code. Server will restart in ~5 seconds.' });
+  // dist/ is pre-built and committed — git pull is all that's needed
   setTimeout(() => {
-    exec('git pull && npm run build', { cwd: __dirname }, (err, stdout, stderr) => {
+    exec('git pull', { cwd: __dirname, timeout: 30000 }, (err, stdout, stderr) => {
       if (err) {
         console.error('Update failed:', stderr);
       } else {
-        console.log('Update successful. Restarting...');
-        process.exit(0); // start.bat restart loop picks this up
+        console.log('Update successful:', stdout.trim(), '— restarting...');
+        process.exit(0); // restart loop (PM2 / bat loop) picks this up
       }
     });
   }, 500);
 });
+
+// ─── Auto-update on startup: git pull so every restart picks up latest code ──
+try {
+  const pullResult = execSync('git pull', { cwd: __dirname, timeout: 15000 }).toString().trim();
+  if (pullResult && pullResult !== 'Already up to date.') {
+    console.log('✅ Auto-updated from git:', pullResult.split('\n')[0]);
+  }
+} catch (e) {
+  console.log('ℹ️  Git pull skipped (no network / not a git repo):', e.message?.split('\n')[0]);
+}
 
 // ─── Start ───────────────────────────────────────────────────────────────────
 app.listen(PORT, '0.0.0.0', () => {
