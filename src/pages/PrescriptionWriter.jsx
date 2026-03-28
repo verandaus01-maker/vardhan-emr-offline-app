@@ -476,7 +476,8 @@ function PrescriptionWriter() {
     setSaving(true);
 
     try {
-      const isDraft = existingPrescription?.status === 'staff_draft';
+      const isDraft = existingPrescription?.status === 'staff_draft' ||
+        (!existingPrescription?.status && !existingPrescription?.diagnosis);
 
       if (!isDoctor) {
         // Stage 1 — staff saves a draft
@@ -548,7 +549,8 @@ function PrescriptionWriter() {
     );
   }
 
-  const isDraft = existingPrescription?.status === 'staff_draft';
+  const isDraft = existingPrescription?.status === 'staff_draft' ||
+    (!existingPrescription?.status && !existingPrescription?.diagnosis);
 
   return (
     <div className="space-y-6 fade-in max-w-5xl mx-auto">

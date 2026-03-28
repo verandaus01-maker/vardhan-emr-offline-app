@@ -51,6 +51,16 @@ db.version(5).stores({
   prescriptions: '++id, patientId, uhid, date, doctorId, diagnosis, status, syncStatus, createdAt, updatedAt'
 });
 
+// Version 6: Backfill status field on all existing prescriptions that have no status
+// (prescriptions created before the 2-stage workflow was added have status = undefined)
+db.version(6).stores({}).upgrade(async tx => {
+  await tx.table('prescriptions').toCollection().modify(rx => {
+    if (!rx.status) {
+      rx.status = rx.diagnosis ? 'doctor_complete' : 'staff_draft';
+    }
+  });
+});
+
 // Database helper functions
 export class DatabaseService {
   // Expose db instance for direct access

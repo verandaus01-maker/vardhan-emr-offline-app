@@ -550,7 +550,10 @@ function PatientDetails() {
                 const meds = parseMedications(prescription.medications);
                 const isExpanded = expandedPrescription === prescription.id;
 
-                const isDraft = prescription.status === 'staff_draft';
+                // Treat as draft if: explicitly staff_draft, OR no status field and no diagnosis
+                // (old prescriptions created before 2-stage workflow have no status field)
+                const isDraft = prescription.status === 'staff_draft' ||
+                  (!prescription.status && !prescription.diagnosis);
                 const isDoctor = authService.canWrite();
 
                 return (
