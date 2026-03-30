@@ -26,8 +26,9 @@ if errorlevel 1 (
 echo        Node.js found.
 
 echo [2/3] Starting Central Sync Server on port 3001...
-start "NexaCare Sync Server :3001" cmd /k "node server.cjs"
-timeout /t 2 /nobreak >nul
+echo        (Auto-pulls latest code from git on each start)
+start "NexaCare Sync Server :3001" cmd /c ":loop & node server.cjs & goto loop"
+timeout /t 3 /nobreak >nul
 echo        Sync server started.
 
 echo [3/3] Starting App Server on port 3000...

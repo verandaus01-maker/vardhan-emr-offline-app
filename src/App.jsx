@@ -35,6 +35,12 @@ function App() {
 
   useEffect(() => {
     initializeApp();
+    // Auto-reload when a new service worker takes over (picks up latest app code)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        window.location.reload();
+      });
+    }
   }, []);
 
   const initializeApp = async () => {

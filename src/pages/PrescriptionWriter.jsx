@@ -476,7 +476,8 @@ function PrescriptionWriter() {
     setSaving(true);
 
     try {
-      const isDraft = existingPrescription?.status === 'staff_draft';
+      const isDraft = existingPrescription?.status === 'staff_draft' ||
+        (!existingPrescription?.status && !existingPrescription?.diagnosis);
 
       if (!isDoctor) {
         // Stage 1 — staff saves a draft
@@ -485,10 +486,10 @@ function PrescriptionWriter() {
           uhid: patient.uhid,
           date: new Date().toISOString(),
           doctorId: null,
-          complaints: formData.complaints,
-          notes: formData.notes,
+          complaints: '',
+          notes: '',
           vitals: formData.vitals,
-          investigations: formData.investigations,
+          investigations: { ...formData.investigations, ecg: '', echo: '', tmt: '', echoColourDoppler: '' },
           diagnosis: '',
           advisedInvestigations: '',
           nextVisit: '',
@@ -548,7 +549,8 @@ function PrescriptionWriter() {
     );
   }
 
-  const isDraft = existingPrescription?.status === 'staff_draft';
+  const isDraft = existingPrescription?.status === 'staff_draft' ||
+    (!existingPrescription?.status && !existingPrescription?.diagnosis);
 
   return (
     <div className="space-y-6 fade-in max-w-5xl mx-auto">
@@ -585,7 +587,7 @@ function PrescriptionWriter() {
           <span style={{ fontSize: '20px' }}>📋</span>
           <div>
             <strong style={{ color: '#92400e' }}>Stage 1 — Staff Entry</strong>
-            <p style={{ color: '#78350f', margin: 0, fontSize: '13px' }}>Fill symptoms, vitals and pathology values. Doctor will complete diagnosis and medicines.</p>
+            <p style={{ color: '#78350f', margin: 0, fontSize: '13px' }}>Fill vitals and pathology test values. Symptoms, ECG / Echo / TMT, Diagnosis and Medicines will be filled by Dr. Vivek.</p>
           </div>
         </div>
       )}
@@ -594,7 +596,7 @@ function PrescriptionWriter() {
           <CheckCircle style={{ color: '#16a34a', width: '24px', height: '24px', flexShrink: 0 }} />
           <div>
             <strong style={{ color: '#166534' }}>Stage 2 — Doctor Completion</strong>
-            <p style={{ color: '#14532d', margin: 0, fontSize: '13px' }}>Patient details filled by staff are shown below (read-only). Please add Diagnosis, Medications and Advice.</p>
+            <p style={{ color: '#14532d', margin: 0, fontSize: '13px' }}>Vitals & pathology results filled by nursing are shown read-only. Please fill Symptoms, ECG / Echo / TMT, Diagnosis and Medications.</p>
           </div>
         </div>
       )}
@@ -617,10 +619,13 @@ function PrescriptionWriter() {
         <style>{`
           @media print {
             @page {
-              margin-top: 58mm;
+              margin-top: 10mm;
               margin-bottom: 28mm;
               margin-left: 10mm;
               margin-right: 10mm;
+            }
+            @page :first {
+              margin-top: 58mm;
             }
           }
           .inv-table th {
@@ -654,36 +659,14 @@ function PrescriptionWriter() {
           </table>
         </div>
 
-        {/* Symptoms */}
-        <div className="no-print" style={{ marginBottom: '8px' }}>
-          <strong style={{ fontSize: '11pt' }}>Symptoms: {isDoctor && isDraft && <span style={{ fontSize: '9pt', color: '#6b7280', fontWeight: 'normal' }}>(filled by staff)</span>}</strong>
-          <textarea
-            value={formData.complaints}
-            onChange={(e) => !( isDoctor && isDraft) && setFormData({ ...formData, complaints: e.target.value })}
-            readOnly={isDoctor && isDraft}
-            rows="2"
-            placeholder="Generalised weakness, Chest pain"
-            style={{ width: '100%', fontSize: '10.5pt', padding: '4px 6px', border: '1px solid #ccc', borderRadius: '3px', marginTop: '3px', background: (isDoctor && isDraft) ? '#f9fafb' : 'white' }}
-          />
-        </div>
+        {/* Symptoms — screen input is in doctor section below; print-only here for correct print order */}
         {formData.complaints && (
           <div className="print-only" style={{ marginBottom: '6px', fontSize: '11pt' }}>
             <strong>Symptoms:</strong> {formData.complaints}
           </div>
         )}
 
-        {/* Notes */}
-        <div className="no-print" style={{ marginBottom: '8px' }}>
-          <strong style={{ fontSize: '11pt' }}>Notes: {isDoctor && isDraft && <span style={{ fontSize: '9pt', color: '#6b7280', fontWeight: 'normal' }}>(filled by staff)</span>}</strong>
-          <textarea
-            value={formData.notes}
-            onChange={(e) => !(isDoctor && isDraft) && setFormData({ ...formData, notes: e.target.value })}
-            readOnly={isDoctor && isDraft}
-            rows="2"
-            placeholder="Clinical notes: Recently admitted with NSTEMI, ECHO—ICMP"
-            style={{ width: '100%', fontSize: '10.5pt', padding: '4px 6px', border: '1px solid #ccc', borderRadius: '3px', marginTop: '3px', background: (isDoctor && isDraft) ? '#f9fafb' : 'white' }}
-          />
-        </div>
+        {/* Notes — screen input is in doctor section below; print-only here for correct print order */}
         {formData.notes && (
           <div className="print-only" style={{ marginBottom: '6px', fontSize: '11pt' }}>
             <strong>Notes:</strong> {formData.notes}
@@ -692,8 +675,8 @@ function PrescriptionWriter() {
 
         {/* Vitals */}
         <div className="no-print" style={{ marginBottom: '8px' }}>
-          <strong style={{ fontSize: '11pt' }}>Vitals: {isDoctor && isDraft && <span style={{ fontSize: '9pt', color: '#6b7280', fontWeight: 'normal' }}>(filled by staff)</span>}</strong>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '3px' }}>
+          <strong style={{ fontSize: '11pt' }}>Vitals: {isDoctor && isDraft && <span style={{ fontSize: '9pt', color: '#059669', fontWeight: 'normal' }}>(filled by nursing — read only)</span>}</strong>
+          <div style={{ display: 'flex', gap: '8px', marginTop: '3px', pointerEvents: (isDoctor && isDraft) ? 'none' : 'auto', opacity: (isDoctor && isDraft) ? 0.75 : 1, background: (isDoctor && isDraft) ? '#f9fafb' : 'transparent', borderRadius: '4px', padding: (isDoctor && isDraft) ? '4px 8px' : '0', border: (isDoctor && isDraft) ? '1px solid #e5e7eb' : 'none' }}>
             <input type="text" value={formData.vitals.pulse} onChange={(e) => !(isDoctor && isDraft) && setFormData({ ...formData, vitals: { ...formData.vitals, pulse: e.target.value }})} readOnly={isDoctor && isDraft} placeholder="Pulse: 70" style={{ flex: 1, fontSize: '10.5pt', padding: '4px 6px', border: '1px solid #ccc', borderRadius: '3px', background: (isDoctor && isDraft) ? '#f9fafb' : 'white' }} />
             <input type="text" value={formData.vitals.spo2} onChange={(e) => !(isDoctor && isDraft) && setFormData({ ...formData, vitals: { ...formData.vitals, spo2: e.target.value }})} readOnly={isDoctor && isDraft} placeholder="SPO2: 96" style={{ flex: 1, fontSize: '10.5pt', padding: '4px 6px', border: '1px solid #ccc', borderRadius: '3px', background: (isDoctor && isDraft) ? '#f9fafb' : 'white' }} />
             <input type="text" value={formData.vitals.bp} onChange={(e) => !(isDoctor && isDraft) && setFormData({ ...formData, vitals: { ...formData.vitals, bp: e.target.value }})} readOnly={isDoctor && isDraft} placeholder="BP: 110/80" style={{ flex: 1, fontSize: '10.5pt', padding: '4px 6px', border: '1px solid #ccc', borderRadius: '3px', background: (isDoctor && isDraft) ? '#f9fafb' : 'white' }} />
@@ -707,8 +690,12 @@ function PrescriptionWriter() {
 
         {/* Investigation Results - SCREEN */}
         <div className="no-print" style={{ marginBottom: '8px' }}>
-          <strong style={{ fontSize: '11pt', display: 'block', marginBottom: '5px' }}>Investigation Results:</strong>
-          <div style={{ fontSize: '9pt', color: '#888', marginBottom: '6px' }}>Fill only the tests performed. Empty tests will not appear on print.</div>
+          <strong style={{ fontSize: '11pt', display: 'block', marginBottom: '5px' }}>
+            Investigation Results:
+            {isDoctor && isDraft && <span style={{ fontSize: '9pt', color: '#059669', fontWeight: 'normal', marginLeft: '8px' }}>(filled by nursing — read only)</span>}
+          </strong>
+          {!isDoctor && <div style={{ fontSize: '9pt', color: '#888', marginBottom: '6px' }}>Fill only the tests performed. Empty tests will not appear on print.</div>}
+          <div style={{ pointerEvents: (isDoctor && isDraft) ? 'none' : 'auto', opacity: (isDoctor && isDraft) ? 0.75 : 1, background: (isDoctor && isDraft) ? '#f9fafb' : 'transparent', borderRadius: '4px', padding: (isDoctor && isDraft) ? '8px' : '0', border: (isDoctor && isDraft) ? '1px solid #e5e7eb' : 'none' }}>
 
           {/* KFT */}
           <div style={{ marginBottom: '6px' }}>
@@ -853,23 +840,7 @@ function PrescriptionWriter() {
             </div>
           </div>
 
-          {/* ECG */}
-          <div style={{ marginBottom: '6px' }}>
-            <div style={{ fontSize: '10pt', fontWeight: '700', marginBottom: '2px' }}>ECG</div>
-            <input type="text" value={formData.investigations.ecg} onChange={(e) => updateInvestigation('ecg', null, e.target.value)} placeholder="SR, QS V1-V5, LBBB etc." style={{ width: '100%', fontSize: '9.5pt', padding: '3px 4px', border: '1px solid #999' }} />
-          </div>
-
-          {/* Echocardiography */}
-          <div style={{ marginBottom: '6px' }}>
-            <div style={{ fontSize: '10pt', fontWeight: '700', marginBottom: '2px' }}>Echocardiography-Colour Doppler</div>
-            <input type="text" value={formData.investigations.echo} onChange={(e) => updateInvestigation('echo', null, e.target.value)} placeholder="LAD Hx, Normal Valves, LVEF 50%" style={{ width: '100%', fontSize: '9.5pt', padding: '3px 4px', border: '1px solid #999' }} />
-          </div>
-
-          {/* TMT */}
-          <div style={{ marginBottom: '6px' }}>
-            <div style={{ fontSize: '10pt', fontWeight: '700', marginBottom: '2px' }}>Treadmill Exercise Test (TMT)</div>
-            <input type="text" value={formData.investigations.tmt} onChange={(e) => updateInvestigation('tmt', null, e.target.value)} placeholder="Positive / Negative / Inconclusive" style={{ width: '100%', fontSize: '9.5pt', padding: '3px 4px', border: '1px solid #999' }} />
-          </div>
+          </div>{/* end pathology read-only wrapper */}
         </div>
 
         {/* Print Investigations */}
@@ -1161,7 +1132,7 @@ function PrescriptionWriter() {
         {isDoctor && isDraft && (
           <div className="no-print" style={{ margin: '16px 0 12px', padding: '10px 14px', background: '#f0fdf4', border: '2px solid #22c55e', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Lock style={{ width: '18px', height: '18px', color: '#16a34a' }} />
-            <strong style={{ color: '#166534', fontSize: '11pt' }}>Dr. Vivek — Fill below (Diagnosis, Medicines, Advice)</strong>
+            <strong style={{ color: '#166534', fontSize: '11pt' }}>Dr. Vivek — Fill below (Symptoms, ECG / Echo / TMT, Diagnosis, Medicines)</strong>
           </div>
         )}
 
@@ -1169,8 +1140,46 @@ function PrescriptionWriter() {
         {!isDoctor && (
           <div className="no-print" style={{ padding: '10px 14px', background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: '6px', marginBottom: '8px', fontSize: '12pt', color: '#92400e' }}>
             <Lock style={{ width: '16px', height: '16px', display: 'inline', marginRight: '6px' }} />
-            <strong>Diagnosis, Medicines and Advice</strong> — to be filled by Dr. Vivek after you save.
+            <strong>Symptoms, ECG / Echo / TMT, Diagnosis, Medicines and Advice</strong> — to be filled by Dr. Vivek after you save.
           </div>
+        )}
+
+        {/* Symptoms, Notes, ECG, Echo, TMT — Doctor fills on screen */}
+        {isDoctor && (
+          <>
+            <div className="no-print" style={{ marginBottom: '8px' }}>
+              <strong style={{ fontSize: '11pt' }}>Symptoms:</strong>
+              <textarea
+                value={formData.complaints}
+                onChange={(e) => setFormData({ ...formData, complaints: e.target.value })}
+                rows="2"
+                placeholder="Generalised weakness, Chest pain"
+                style={{ width: '100%', fontSize: '10.5pt', padding: '4px 6px', border: '1px solid #ccc', borderRadius: '3px', marginTop: '3px' }}
+              />
+            </div>
+            <div className="no-print" style={{ marginBottom: '8px' }}>
+              <strong style={{ fontSize: '11pt' }}>Notes:</strong>
+              <textarea
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                rows="2"
+                placeholder="Clinical notes: Recently admitted with NSTEMI, ECHO—ICMP"
+                style={{ width: '100%', fontSize: '10.5pt', padding: '4px 6px', border: '1px solid #ccc', borderRadius: '3px', marginTop: '3px' }}
+              />
+            </div>
+            <div className="no-print" style={{ marginBottom: '6px' }}>
+              <div style={{ fontSize: '10pt', fontWeight: '700', marginBottom: '2px' }}>ECG</div>
+              <input type="text" value={formData.investigations.ecg} onChange={(e) => updateInvestigation('ecg', null, e.target.value)} placeholder="SR, QS V1-V5, LBBB etc." style={{ width: '100%', fontSize: '9.5pt', padding: '3px 4px', border: '1px solid #999', borderRadius: '3px' }} />
+            </div>
+            <div className="no-print" style={{ marginBottom: '6px' }}>
+              <div style={{ fontSize: '10pt', fontWeight: '700', marginBottom: '2px' }}>Echocardiography-Colour Doppler</div>
+              <input type="text" value={formData.investigations.echo} onChange={(e) => updateInvestigation('echo', null, e.target.value)} placeholder="LAD Hx, Normal Valves, LVEF 50%" style={{ width: '100%', fontSize: '9.5pt', padding: '3px 4px', border: '1px solid #999', borderRadius: '3px' }} />
+            </div>
+            <div className="no-print" style={{ marginBottom: '8px' }}>
+              <div style={{ fontSize: '10pt', fontWeight: '700', marginBottom: '2px' }}>Treadmill Exercise Test (TMT)</div>
+              <input type="text" value={formData.investigations.tmt} onChange={(e) => updateInvestigation('tmt', null, e.target.value)} placeholder="Positive / Negative / Inconclusive" style={{ width: '100%', fontSize: '9.5pt', padding: '3px 4px', border: '1px solid #999', borderRadius: '3px' }} />
+            </div>
+          </>
         )}
 
         {/* Diagnosis */}
