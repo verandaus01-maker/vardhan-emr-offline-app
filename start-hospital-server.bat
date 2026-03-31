@@ -8,14 +8,16 @@ echo   NexaCare Pro - Vardhan Hospital Server
 echo   by NexaVoyagers Technologies Pvt. Ltd.
 echo ============================================================
 echo.
-echo   NOTE: If running for the first time or IP 1.22.20.11
-echo         is not yet configured, run SETUP-AND-START.bat
-echo         as Administrator instead.
-echo.
 
 cd /d "%~dp0"
 
-echo [1/3] Checking Node.js...
+echo [0/4] Stopping any existing NexaCare processes...
+taskkill /f /fi "WINDOWTITLE eq NexaCare*" >nul 2>&1
+taskkill /f /im node.exe >nul 2>&1
+timeout /t 2 /nobreak >nul
+echo        Done.
+
+echo [1/4] Checking Node.js...
 node --version >nul 2>&1
 if errorlevel 1 (
     echo ERROR: Node.js is not installed or not in PATH.
@@ -25,13 +27,20 @@ if errorlevel 1 (
 )
 echo        Node.js found.
 
-echo [2/3] Starting Central Sync Server on port 3001...
-echo        (Auto-pulls latest code from git on each start)
+echo [2/4] Getting latest updates from internet...
+git pull >nul 2>&1
+if errorlevel 1 (
+    echo        (No internet or git not set up - using existing code)
+) else (
+    echo        Code updated.
+)
+
+echo [3/4] Starting Central Sync Server on port 3001...
 start "NexaCare Sync Server :3001" cmd /c ":loop & node server.cjs & goto loop"
 timeout /t 3 /nobreak >nul
 echo        Sync server started.
 
-echo [3/3] Starting App Server on port 3000...
+echo [4/4] Starting App Server on port 3000...
 if exist "node_modules\.bin\serve.cmd" (
     start "NexaCare App Server :3000" cmd /k "node_modules\.bin\serve dist -l 3000 -s"
 ) else (
@@ -45,10 +54,8 @@ echo ============================================================
 echo   Servers are running!
 echo.
 echo   All hospital devices open:  http://1.22.20.11:3000
+echo   Also try:                   http://192.168.1.131:3000
 echo   Admin login:  admin / Vardhan@Hospital12*
-echo.
-echo   (If 1.22.20.11 not working, run SETUP-AND-START.bat
-echo    as Administrator to configure the IP first)
 echo ============================================================
 echo.
 
