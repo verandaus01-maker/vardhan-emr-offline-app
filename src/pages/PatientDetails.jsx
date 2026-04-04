@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import DatabaseService from '../services/database';
 import authService from '../services/authService';
+import { getServerUrl } from '../utils/serverUrl';
 import { format } from 'date-fns';
 
 function PatientDetails() {
@@ -98,6 +99,55 @@ function PatientDetails() {
       setVitals(patientVitals);
       setLabReports(patientLabReports);
       setLoading(false);
+
+      // Auto-pull prescriptions from server (for cross-profile sync: staff → doctor)
+      if (patientData.uhid) {
+        try {
+          const res = await fetch(`${getServerUrl()}/api/prescriptions?uhid=${encodeURIComponent(patientData.uhid)}&limit=100`);
+          if (res.ok) {
+            const data = await res.json();
+            const serverRxs = data.prescriptions || data || [];
+            let merged = false;
+            for (const srx of serverRxs) {
+              // Try to find matching local prescription by createdAt + patientId
+              const localMatch = await DatabaseService.db.prescriptions
+                .where('patientId').equals(patientData.id)
+                .filter(lrx => lrx.createdAt === srx.createdAt)
+                .first();
+              if (!localMatch) {
+                // Not in local DB — add it
+                const toAdd = { ...srx };
+                delete toAdd.id; // let Dexie assign a new local ID
+                toAdd.patientId = patientData.id;
+                toAdd.syncStatus = 'synced';
+                if (toAdd.medications && typeof toAdd.medications === 'string') {
+                  try { toAdd.medications = JSON.parse(toAdd.medications); } catch (_) {}
+                }
+                await DatabaseService.db.prescriptions.add(toAdd);
+                merged = true;
+              } else if (srx.status === 'doctor_complete' && localMatch.status !== 'doctor_complete') {
+                // Server has completed version — update local
+                await DatabaseService.db.prescriptions.update(localMatch.id, {
+                  status: 'doctor_complete',
+                  diagnosis: srx.diagnosis || localMatch.diagnosis,
+                  notes: srx.notes || localMatch.notes,
+                  syncStatus: 'synced'
+                });
+                merged = true;
+              }
+            }
+            if (merged) {
+              // Reload prescriptions from local DB after merge
+              const refreshed = await DatabaseService.db.prescriptions
+                .where('patientId').equals(patientData.id)
+                .reverse().sortBy('createdAt');
+              setPrescriptions(refreshed);
+            }
+          }
+        } catch (syncErr) {
+          console.log('Server sync skipped (offline?):', syncErr.message);
+        }
+      }
     } catch (error) {
       console.error('❌ Failed to load patient data:', error);
       setPatient(null);

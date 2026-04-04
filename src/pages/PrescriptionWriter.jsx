@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, X, Save, Printer, Search, Lock, CheckCircle } from 'lucide-react';
 import DatabaseService from '../services/database';
 import authService from '../services/authService';
+import { getServerUrl } from '../utils/serverUrl';
 import { format } from 'date-fns';
 
 function PrescriptionWriter() {
@@ -501,6 +502,11 @@ function PrescriptionWriter() {
         } else {
           await DatabaseService.addPrescription(prescriptionData);
         }
+        // Immediately push to hospital server so doctor can see it on any device/profile
+        fetch(`${getServerUrl()}/api/prescriptions/bulk`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prescriptions: [prescriptionData] })
+        }).catch(() => {});
         alert('✅ Saved! Waiting for Doctor to complete.');
         navigate(`/patients/${patientId}`);
 
@@ -526,6 +532,11 @@ function PrescriptionWriter() {
         } else {
           await DatabaseService.addPrescription(prescriptionData);
         }
+        // Immediately push completed prescription to server
+        fetch(`${getServerUrl()}/api/prescriptions/bulk`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prescriptions: [prescriptionData] })
+        }).catch(() => {});
         alert('✅ Prescription Complete!');
         navigate(`/patients/${patientId}`);
       }

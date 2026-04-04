@@ -384,6 +384,12 @@ app.get('/api/prescriptions', (req, res) => {
       INNER JOIN (SELECT MIN(id) as id FROM prescriptions WHERE patientId=? GROUP BY COALESCE(uhid,''), COALESCE(createdAt,'')) d ON p.id = d.id
       ORDER BY p.createdAt DESC LIMIT ? OFFSET ?
     `).all(parseInt(patientId), lim, offset);
+  } else if (uhid) {
+    rows = db.prepare(`
+      SELECT p.* FROM prescriptions p
+      INNER JOIN (SELECT MIN(id) as id FROM prescriptions WHERE uhid=? GROUP BY COALESCE(uhid,''), COALESCE(createdAt,'')) d ON p.id = d.id
+      ORDER BY p.createdAt DESC LIMIT ? OFFSET ?
+    `).all(uhid, lim, offset);
   } else if (updatedAfter) {
     rows = db.prepare(`
       SELECT p.* FROM prescriptions p
