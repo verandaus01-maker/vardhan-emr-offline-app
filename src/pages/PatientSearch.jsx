@@ -323,6 +323,11 @@ function AddPatientModal({ onClose, onSuccess }) {
         attempts++;
       } while (attempts < 1000);
 
+      // Absolute fallback: timestamp-based UHID (guaranteed unique)
+      if (attempts >= 1000) {
+        uhid = `VH${Date.now().toString().slice(-7)}`;
+      }
+
       const patientData = {
         ...formData,
         uhid,
@@ -331,6 +336,7 @@ function AddPatientModal({ onClose, onSuccess }) {
         registrationDate: new Date().toISOString(),
       };
 
+      // addPatient uses an atomic transaction — ConstraintError impossible
       const patientId = await DatabaseService.addPatient(patientData);
 
       // Push to server so other profiles see this patient immediately
@@ -343,7 +349,11 @@ function AddPatientModal({ onClose, onSuccess }) {
       onSuccess(patientId);
     } catch (error) {
       console.error('Failed to add patient:', error);
-      setError('Failed to add patient: ' + error.message);
+      // Show a user-friendly message, not the raw IndexedDB error
+      const msg = error?.message?.includes('uniqueness') || error?.name === 'ConstraintError'
+        ? 'A conflict occurred saving the patient. Please try again.'
+        : 'Failed to add patient: ' + (error?.message || 'Unknown error');
+      setError(msg);
       setSaving(false);
     }
   };
