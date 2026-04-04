@@ -509,7 +509,7 @@ function PrescriptionWriter() {
       if (!isDoctor) {
         // Stage 1 — staff saves a draft
         const prescriptionData = {
-          patientId: parseInt(patientId),
+          patientId: patient.id,
           uhid: patient.uhid,
           date: new Date().toISOString(),
           doctorId: null,
@@ -539,7 +539,7 @@ function PrescriptionWriter() {
       } else {
         // Stage 2 — doctor completes
         const prescriptionData = {
-          patientId: parseInt(patientId),
+          patientId: patient.id,
           uhid: patient.uhid,
           date: existingPrescription?.date || new Date().toISOString(),
           doctorId: currentUser?.id || 1,

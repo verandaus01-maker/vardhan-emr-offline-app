@@ -47,6 +47,29 @@ function App() {
         setInterval(() => reg.update(), 60000);
       });
     }
+    // Poll server version every 30s — if server has newer code, clear SW cache and reload
+    let cachedVersion = null;
+    const checkVersion = async () => {
+      try {
+        const res = await fetch(`${getServerUrl()}/api/version?t=${Date.now()}`);
+        if (!res.ok) return;
+        const { version } = await res.json();
+        if (cachedVersion && cachedVersion !== version) {
+          // Server has new code — clear SW caches and reload
+          if ('serviceWorker' in navigator) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            for (const reg of regs) await reg.unregister();
+          }
+          const keys = await caches.keys();
+          for (const key of keys) await caches.delete(key);
+          window.location.reload(true);
+        }
+        cachedVersion = version;
+      } catch (_) {}
+    };
+    checkVersion();
+    const versionTimer = setInterval(checkVersion, 30000);
+    return () => clearInterval(versionTimer);
   }, []);
 
   const initializeApp = async () => {
