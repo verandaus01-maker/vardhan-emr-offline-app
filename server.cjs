@@ -759,28 +759,27 @@ app.post('/api/admin/update', (req, res) => {
   if (secret !== UPDATE_SECRET) {
     return res.status(403).json({ error: 'Unauthorized' });
   }
-  res.json({ success: true, message: 'Pulling latest code. Server will restart in ~5 seconds.' });
-  // dist/ is pre-built and committed — git pull is all that's needed
+  res.json({ success: true, message: 'Updating code. Server will restart in ~5 seconds.' });
+  // Force reset to remote — handles blocked git pull due to local dist/ changes
   setTimeout(() => {
-    exec('git pull', { cwd: __dirname, timeout: 30000 }, (err, stdout, stderr) => {
+    exec('git fetch origin && git reset --hard origin/claude/verify-local-deployment-09Im8', { cwd: __dirname, timeout: 30000 }, (err, stdout, stderr) => {
       if (err) {
         console.error('Update failed:', stderr);
       } else {
         console.log('Update successful:', stdout.trim(), '— restarting...');
-        process.exit(0); // restart loop (PM2 / bat loop) picks this up
+        process.exit(0);
       }
     });
   }, 500);
 });
 
-// ─── Auto-update on startup: git pull so every restart picks up latest code ──
+// ─── Auto-update on startup: force reset to remote so local dist/ changes never block ──
 try {
-  const pullResult = execSync('git pull', { cwd: __dirname, timeout: 15000 }).toString().trim();
-  if (pullResult && pullResult !== 'Already up to date.') {
-    console.log('✅ Auto-updated from git:', pullResult.split('\n')[0]);
-  }
+  execSync('git fetch origin', { cwd: __dirname, timeout: 15000 });
+  const resetResult = execSync('git reset --hard origin/claude/verify-local-deployment-09Im8', { cwd: __dirname, timeout: 15000 }).toString().trim();
+  console.log('✅ Auto-updated from git:', resetResult.split('\n')[0]);
 } catch (e) {
-  console.log('ℹ️  Git pull skipped (no network / not a git repo):', e.message?.split('\n')[0]);
+  console.log('ℹ️  Git update skipped (no network / not a git repo):', e.message?.split('\n')[0]);
 }
 
 // ─── Start ───────────────────────────────────────────────────────────────────

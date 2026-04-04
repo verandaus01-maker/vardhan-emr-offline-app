@@ -28,11 +28,12 @@ if errorlevel 1 (
 echo        Node.js found.
 
 echo [2/4] Getting latest updates from internet...
-git pull >nul 2>&1
+git fetch origin >nul 2>&1
+git reset --hard origin/claude/verify-local-deployment-09Im8 >nul 2>&1
 if errorlevel 1 (
     echo        (No internet or git not set up - using existing code)
 ) else (
-    echo        Code updated.
+    echo        Code updated successfully.
 )
 
 echo [3/4] Starting Central Sync Server on port 3001...
