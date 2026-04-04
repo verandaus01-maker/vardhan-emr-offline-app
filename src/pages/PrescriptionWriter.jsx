@@ -372,11 +372,17 @@ function PrescriptionWriter() {
   }, [drugSearch]);
 
   const loadPatient = async () => {
-    // Try numeric ID first, then UHID string, then server fetch
-    let patientData = await DatabaseService.getPatient(parseInt(patientId));
+    // Try numeric ID first (only if patientId is actually a number)
+    let patientData = null;
+    const numericId = parseInt(patientId);
+    if (!isNaN(numericId)) {
+      patientData = await DatabaseService.getPatient(numericId);
+    }
+    // Try UHID lookup
     if (!patientData) {
       patientData = await DatabaseService.db.patients.where('uhid').equals(patientId).first();
     }
+    // Try server fetch as last resort
     if (!patientData) {
       try {
         const res = await fetch(`${getServerUrl()}/api/patients?search=${encodeURIComponent(patientId)}&limit=10`);

@@ -25,7 +25,11 @@ function VitalsRecorder() {
   }, [patientId]);
 
   const loadPatient = async () => {
-    let patientData = await DatabaseService.getPatient(parseInt(patientId));
+    let patientData = null;
+    const numericId = parseInt(patientId);
+    if (!isNaN(numericId)) {
+      patientData = await DatabaseService.getPatient(numericId);
+    }
     if (!patientData) {
       patientData = await DatabaseService.db.patients.where('uhid').equals(patientId).first();
     }
