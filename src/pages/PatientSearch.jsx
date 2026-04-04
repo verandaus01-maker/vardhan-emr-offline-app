@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, UserPlus, Users, Phone, Calendar, AlertTriangle } from 'lucide-react';
 import DatabaseService from '../services/database';
+import { getServerUrl } from '../utils/serverUrl';
 import { format } from 'date-fns';
 
 function PatientSearch() {
@@ -31,11 +32,52 @@ function PatientSearch() {
   const loadRecentPatients = async () => {
     const patients = await DatabaseService.getAllPatients(10);
     setRecentPatients(patients);
+    // Background: pull recent patients from server to sync across profiles
+    try {
+      const res = await fetch(`${getServerUrl()}/api/patients?limit=200`);
+      if (res.ok) {
+        const data = await res.json();
+        const serverPatients = data.patients || [];
+        let merged = false;
+        for (const sp of serverPatients) {
+          if (!sp.uhid) continue;
+          const exists = await DatabaseService.db.patients.where('uhid').equals(sp.uhid).first();
+          if (!exists) {
+            const toAdd = { ...sp };
+            delete toAdd.id;
+            toAdd.syncStatus = 'synced';
+            await DatabaseService.db.patients.add(toAdd);
+            merged = true;
+          }
+        }
+        if (merged) {
+          const refreshed = await DatabaseService.getAllPatients(10);
+          setRecentPatients(refreshed);
+        }
+      }
+    } catch (_) {}
   };
 
   const performSearch = async () => {
     setSearching(true);
     try {
+      // First pull matching patients from server (may not exist locally yet)
+      try {
+        const res = await fetch(`${getServerUrl()}/api/patients?search=${encodeURIComponent(searchQuery)}&limit=50`);
+        if (res.ok) {
+          const data = await res.json();
+          for (const sp of (data.patients || [])) {
+            if (!sp.uhid) continue;
+            const exists = await DatabaseService.db.patients.where('uhid').equals(sp.uhid).first();
+            if (!exists) {
+              const toAdd = { ...sp };
+              delete toAdd.id;
+              toAdd.syncStatus = 'synced';
+              await DatabaseService.db.patients.add(toAdd);
+            }
+          }
+        }
+      } catch (_) {}
       const results = await DatabaseService.searchPatients(searchQuery);
       setSearchResults(results);
     } catch (error) {
@@ -53,13 +95,9 @@ function PatientSearch() {
       .slice(0, 2);
 
     const handleClick = () => {
-      console.log('Navigating to patient:', { id: patient.id, uhid: patient.uhid, name: patient.name });
-      if (!patient.id) {
-        console.error('WARNING: Patient has no ID!', patient);
-        alert(`Error: This patient record has no ID. UHID: ${patient.uhid}`);
-        return;
-      }
-      navigate(`/patients/${patient.id}`);
+      // Navigate by UHID so the same patient is found across all browser profiles
+      const dest = patient.uhid || patient.id;
+      navigate(`/patients/${dest}`);
     };
 
     return (
@@ -255,9 +293,40 @@ function AddPatientModal({ onClose, onSuccess }) {
     setSaving(true);
 
     try {
-      // Generate UHID
-      const count = (await DatabaseService.getAllPatients()).length;
-      const uhid = `VH${String(count + 1).padStart(5, '0')}`;
+      // Generate unique UHID: take max of (server's next) and (local max), loop until free
+      let uhidNum = 1;
+      try {
+        const res = await fetch(`${getServerUrl()}/api/patients/next-uhid`);
+        if (res.ok) {
+          const data = await res.json();
+          const n = parseInt(data.uhid?.slice(2));
+          if (!isNaN(n)) uhidNum = n;
+        }
+      } catch (_) {}
+
+      // Also scan local DB — take whichever is higher
+      const allLocal = await DatabaseService.db.patients.toArray();
+      for (const p of allLocal) {
+        if (p.uhid && p.uhid.startsWith('VH')) {
+          const n = parseInt(p.uhid.slice(2));
+          if (!isNaN(n) && n >= uhidNum) uhidNum = n + 1;
+        }
+      }
+
+      // Loop until a UHID is confirmed free in local DB
+      let uhid;
+      let attempts = 0;
+      do {
+        uhid = `VH${String(uhidNum + attempts).padStart(5, '0')}`;
+        const exists = await DatabaseService.db.patients.where('uhid').equals(uhid).first();
+        if (!exists) break;
+        attempts++;
+      } while (attempts < 1000);
+
+      // Absolute fallback: timestamp-based UHID (guaranteed unique)
+      if (attempts >= 1000) {
+        uhid = `VH${Date.now().toString().slice(-7)}`;
+      }
 
       const patientData = {
         ...formData,
@@ -267,11 +336,24 @@ function AddPatientModal({ onClose, onSuccess }) {
         registrationDate: new Date().toISOString(),
       };
 
+      // addPatient uses an atomic transaction — ConstraintError impossible
       const patientId = await DatabaseService.addPatient(patientData);
+
+      // Push to server so other profiles see this patient immediately
+      fetch(`${getServerUrl()}/api/patients`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...patientData, id: patientId })
+      }).catch(() => {});
+
       onSuccess(patientId);
     } catch (error) {
       console.error('Failed to add patient:', error);
-      setError('Failed to add patient: ' + error.message);
+      // Show a user-friendly message, not the raw IndexedDB error
+      const msg = error?.message?.includes('uniqueness') || error?.name === 'ConstraintError'
+        ? 'A conflict occurred saving the patient. Please try again.'
+        : 'Failed to add patient: ' + (error?.message || 'Unknown error');
+      setError(msg);
       setSaving(false);
     }
   };

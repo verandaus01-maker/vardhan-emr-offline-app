@@ -766,6 +766,31 @@ function Settings() {
           )}
         </div>
 
+        {/* Force Update — clears service worker cache and reloads with latest code */}
+        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-300 rounded-xl">
+          <p className="text-sm font-bold text-yellow-800 mb-2">App not updating? Use this:</p>
+          <button
+            onClick={async () => {
+              if (!confirm('This will clear the app cache and reload. You will need to log in again. Continue?')) return;
+              try {
+                if ('serviceWorker' in navigator) {
+                  const regs = await navigator.serviceWorker.getRegistrations();
+                  for (const reg of regs) await reg.unregister();
+                }
+                const keys = await caches.keys();
+                for (const key of keys) await caches.delete(key);
+              } catch (_) {}
+              window.location.reload(true);
+            }}
+            className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-lg text-sm"
+          >
+            Force Update App (Clear Cache)
+          </button>
+          <p className="text-xs text-gray-500 mt-1">
+            Run this on <strong>each browser profile</strong> after a server update if the app seems outdated.
+          </p>
+        </div>
+
         {/* Sync Users Button — push offline-created users to server */}
         <div>
           <button

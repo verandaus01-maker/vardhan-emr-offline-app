@@ -311,10 +311,14 @@ app.post('/api/auth/users/:id/password', async (req, res) => {
 
 // ─── Patients Routes ─────────────────────────────────────────────────────────
 app.get('/api/patients', (req, res) => {
-  const { page = 1, limit = 500, updatedAfter } = req.query;
+  const { page = 1, limit = 500, updatedAfter, search } = req.query;
   const offset = (page - 1) * limit;
   let rows;
-  if (updatedAfter) {
+  if (search) {
+    const q = `%${search}%`;
+    rows = db.prepare('SELECT * FROM patients WHERE name LIKE ? OR uhid LIKE ? OR phone LIKE ? ORDER BY updatedAt DESC LIMIT ? OFFSET ?')
+      .all(q, q, q, parseInt(limit), offset);
+  } else if (updatedAfter) {
     rows = db.prepare('SELECT * FROM patients WHERE updatedAt > ? OR createdAt > ? ORDER BY updatedAt DESC LIMIT ? OFFSET ?')
       .all(updatedAfter, updatedAfter, parseInt(limit), offset);
   } else {
@@ -345,6 +349,17 @@ app.post('/api/patients', (req, res) => {
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
+});
+
+// Get next available UHID (so all profiles generate unique IDs)
+app.get('/api/patients/next-uhid', (req, res) => {
+  const row = db.prepare(`SELECT uhid FROM patients WHERE uhid LIKE 'VH%' ORDER BY uhid DESC LIMIT 1`).get();
+  let next = 1;
+  if (row && row.uhid) {
+    const n = parseInt(row.uhid.slice(2));
+    if (!isNaN(n)) next = n + 1;
+  }
+  res.json({ uhid: `VH${String(next).padStart(5, '0')}` });
 });
 
 // Bulk upsert patients (for initial data push from admin device)
@@ -744,28 +759,27 @@ app.post('/api/admin/update', (req, res) => {
   if (secret !== UPDATE_SECRET) {
     return res.status(403).json({ error: 'Unauthorized' });
   }
-  res.json({ success: true, message: 'Pulling latest code. Server will restart in ~5 seconds.' });
-  // dist/ is pre-built and committed — git pull is all that's needed
+  res.json({ success: true, message: 'Updating code. Server will restart in ~5 seconds.' });
+  // Force reset to remote — handles blocked git pull due to local dist/ changes
   setTimeout(() => {
-    exec('git pull', { cwd: __dirname, timeout: 30000 }, (err, stdout, stderr) => {
+    exec('git fetch origin && git reset --hard origin/claude/verify-local-deployment-09Im8', { cwd: __dirname, timeout: 30000 }, (err, stdout, stderr) => {
       if (err) {
         console.error('Update failed:', stderr);
       } else {
         console.log('Update successful:', stdout.trim(), '— restarting...');
-        process.exit(0); // restart loop (PM2 / bat loop) picks this up
+        process.exit(0);
       }
     });
   }, 500);
 });
 
-// ─── Auto-update on startup: git pull so every restart picks up latest code ──
+// ─── Auto-update on startup: force reset to remote so local dist/ changes never block ──
 try {
-  const pullResult = execSync('git pull', { cwd: __dirname, timeout: 15000 }).toString().trim();
-  if (pullResult && pullResult !== 'Already up to date.') {
-    console.log('✅ Auto-updated from git:', pullResult.split('\n')[0]);
-  }
+  execSync('git fetch origin', { cwd: __dirname, timeout: 15000 });
+  const resetResult = execSync('git reset --hard origin/claude/verify-local-deployment-09Im8', { cwd: __dirname, timeout: 15000 }).toString().trim();
+  console.log('✅ Auto-updated from git:', resetResult.split('\n')[0]);
 } catch (e) {
-  console.log('ℹ️  Git pull skipped (no network / not a git repo):', e.message?.split('\n')[0]);
+  console.log('ℹ️  Git update skipped (no network / not a git repo):', e.message?.split('\n')[0]);
 }
 
 // ─── Start ───────────────────────────────────────────────────────────────────

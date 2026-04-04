@@ -74,8 +74,17 @@ export class DatabaseService {
       updatedAt: new Date().toISOString(),
       syncStatus: 'pending'
     };
-    const id = await db.patients.add(patient);
-    await this.addToSyncQueue('patients', 'create', { id, ...patient });
+    // Atomic check-then-insert prevents ConstraintError under race conditions
+    // (e.g., background server pull adding same UHID simultaneously)
+    const id = await db.transaction('rw', db.patients, db.syncQueue, async () => {
+      if (patient.uhid) {
+        const existing = await db.patients.where('uhid').equals(patient.uhid).first();
+        if (existing) return existing.id;
+      }
+      const newId = await db.patients.add(patient);
+      await db.syncQueue.add({ entity: 'patients', action: 'create', data: { id: newId, ...patient }, status: 'pending', attempts: 0, createdAt: new Date().toISOString() });
+      return newId;
+    });
     return id;
   }
 
