@@ -57,10 +57,27 @@ function PatientDetails() {
         console.log('Patient lookup by case-insensitive UHID result:', patientData);
       }
 
-      // Debug: Let's see what patients exist
+      // Not found locally — try fetching from server (cross-profile: patient exists on other device)
       if (!patientData) {
-        const allPatients = await DatabaseService.db.patients.limit(5).toArray();
-        console.log('Sample patients in database:', allPatients.map(p => ({ id: p.id, uhid: p.uhid, name: p.name })));
+        try {
+          const res = await fetch(`${getServerUrl()}/api/patients?search=${encodeURIComponent(patientId)}&limit=20`);
+          if (res.ok) {
+            const data = await res.json();
+            const sp = (data.patients || []).find(p =>
+              p.uhid === patientId || String(p.id) === String(patientId)
+            );
+            if (sp) {
+              const toAdd = { ...sp };
+              delete toAdd.id;
+              toAdd.syncStatus = 'synced';
+              const newId = await DatabaseService.db.patients.add(toAdd);
+              patientData = { ...toAdd, id: newId };
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (!patientData) {
         console.error('❌ Patient not found for ID/UHID:', patientId);
         setLoading(false);
         setPatient(null);

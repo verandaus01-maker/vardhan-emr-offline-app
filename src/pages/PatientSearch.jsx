@@ -95,13 +95,9 @@ function PatientSearch() {
       .slice(0, 2);
 
     const handleClick = () => {
-      console.log('Navigating to patient:', { id: patient.id, uhid: patient.uhid, name: patient.name });
-      if (!patient.id) {
-        console.error('WARNING: Patient has no ID!', patient);
-        alert(`Error: This patient record has no ID. UHID: ${patient.uhid}`);
-        return;
-      }
-      navigate(`/patients/${patient.id}`);
+      // Navigate by UHID so the same patient is found across all browser profiles
+      const dest = patient.uhid || patient.id;
+      navigate(`/patients/${dest}`);
     };
 
     return (
@@ -297,36 +293,35 @@ function AddPatientModal({ onClose, onSuccess }) {
     setSaving(true);
 
     try {
-      // Generate a unique UHID — loop until one is free in local DB
-      let uhid;
+      // Generate unique UHID: take max of (server's next) and (local max), loop until free
+      let uhidNum = 1;
       try {
-        // Try to get next UHID from server (authoritative source of all UHIDs)
         const res = await fetch(`${getServerUrl()}/api/patients/next-uhid`);
         if (res.ok) {
           const data = await res.json();
-          uhid = data.uhid;
+          const n = parseInt(data.uhid?.slice(2));
+          if (!isNaN(n)) uhidNum = n;
         }
       } catch (_) {}
 
-      if (!uhid) {
-        // Fallback: compute locally, loop until unique
-        const allLocal = await DatabaseService.db.patients.toArray();
-        // Find max numeric UHID
-        let maxNum = allLocal.length;
-        for (const p of allLocal) {
-          if (p.uhid && p.uhid.startsWith('VH')) {
-            const n = parseInt(p.uhid.slice(2));
-            if (!isNaN(n) && n > maxNum) maxNum = n;
-          }
+      // Also scan local DB — take whichever is higher
+      const allLocal = await DatabaseService.db.patients.toArray();
+      for (const p of allLocal) {
+        if (p.uhid && p.uhid.startsWith('VH')) {
+          const n = parseInt(p.uhid.slice(2));
+          if (!isNaN(n) && n >= uhidNum) uhidNum = n + 1;
         }
-        let attempts = 0;
-        do {
-          uhid = `VH${String(maxNum + 1 + attempts).padStart(5, '0')}`;
-          const exists = await DatabaseService.db.patients.where('uhid').equals(uhid).first();
-          if (!exists) break;
-          attempts++;
-        } while (attempts < 1000);
       }
+
+      // Loop until a UHID is confirmed free in local DB
+      let uhid;
+      let attempts = 0;
+      do {
+        uhid = `VH${String(uhidNum + attempts).padStart(5, '0')}`;
+        const exists = await DatabaseService.db.patients.where('uhid').equals(uhid).first();
+        if (!exists) break;
+        attempts++;
+      } while (attempts < 1000);
 
       const patientData = {
         ...formData,

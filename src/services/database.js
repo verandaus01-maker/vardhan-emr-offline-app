@@ -74,9 +74,18 @@ export class DatabaseService {
       updatedAt: new Date().toISOString(),
       syncStatus: 'pending'
     };
-    const id = await db.patients.add(patient);
-    await this.addToSyncQueue('patients', 'create', { id, ...patient });
-    return id;
+    try {
+      const id = await db.patients.add(patient);
+      await this.addToSyncQueue('patients', 'create', { id, ...patient });
+      return id;
+    } catch (err) {
+      // UHID already exists locally — return existing record's ID
+      if ((err.name === 'ConstraintError' || err.message?.includes('uniqueness')) && patientData.uhid) {
+        const existing = await db.patients.where('uhid').equals(patientData.uhid).first();
+        if (existing) return existing.id;
+      }
+      throw err;
+    }
   }
 
   static async updatePatient(id, updates) {

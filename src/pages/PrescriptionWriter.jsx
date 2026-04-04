@@ -372,7 +372,27 @@ function PrescriptionWriter() {
   }, [drugSearch]);
 
   const loadPatient = async () => {
-    const patientData = await DatabaseService.getPatient(parseInt(patientId));
+    // Try numeric ID first, then UHID string, then server fetch
+    let patientData = await DatabaseService.getPatient(parseInt(patientId));
+    if (!patientData) {
+      patientData = await DatabaseService.db.patients.where('uhid').equals(patientId).first();
+    }
+    if (!patientData) {
+      try {
+        const res = await fetch(`${getServerUrl()}/api/patients?search=${encodeURIComponent(patientId)}&limit=10`);
+        if (res.ok) {
+          const data = await res.json();
+          const sp = (data.patients || []).find(p => p.uhid === patientId);
+          if (sp) {
+            const toAdd = { ...sp };
+            delete toAdd.id;
+            toAdd.syncStatus = 'synced';
+            const newId = await DatabaseService.db.patients.add(toAdd);
+            patientData = { ...toAdd, id: newId };
+          }
+        }
+      } catch (_) {}
+    }
     if (!patientData) {
       navigate('/patients');
       return;
