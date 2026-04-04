@@ -311,10 +311,14 @@ app.post('/api/auth/users/:id/password', async (req, res) => {
 
 // ─── Patients Routes ─────────────────────────────────────────────────────────
 app.get('/api/patients', (req, res) => {
-  const { page = 1, limit = 500, updatedAfter } = req.query;
+  const { page = 1, limit = 500, updatedAfter, search } = req.query;
   const offset = (page - 1) * limit;
   let rows;
-  if (updatedAfter) {
+  if (search) {
+    const q = `%${search}%`;
+    rows = db.prepare('SELECT * FROM patients WHERE name LIKE ? OR uhid LIKE ? OR phone LIKE ? ORDER BY updatedAt DESC LIMIT ? OFFSET ?')
+      .all(q, q, q, parseInt(limit), offset);
+  } else if (updatedAfter) {
     rows = db.prepare('SELECT * FROM patients WHERE updatedAt > ? OR createdAt > ? ORDER BY updatedAt DESC LIMIT ? OFFSET ?')
       .all(updatedAfter, updatedAfter, parseInt(limit), offset);
   } else {
@@ -345,6 +349,17 @@ app.post('/api/patients', (req, res) => {
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
+});
+
+// Get next available UHID (so all profiles generate unique IDs)
+app.get('/api/patients/next-uhid', (req, res) => {
+  const row = db.prepare(`SELECT uhid FROM patients WHERE uhid LIKE 'VH%' ORDER BY uhid DESC LIMIT 1`).get();
+  let next = 1;
+  if (row && row.uhid) {
+    const n = parseInt(row.uhid.slice(2));
+    if (!isNaN(n)) next = n + 1;
+  }
+  res.json({ uhid: `VH${String(next).padStart(5, '0')}` });
 });
 
 // Bulk upsert patients (for initial data push from admin device)
