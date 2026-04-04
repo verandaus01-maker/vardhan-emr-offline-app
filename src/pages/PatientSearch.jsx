@@ -15,6 +15,10 @@ function PatientSearch() {
 
   useEffect(() => {
     loadRecentPatients();
+    // Re-pull from server whenever the tab gets focus (catches patients added on other profiles)
+    const onFocus = () => loadRecentPatients();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
   }, []);
 
   useEffect(() => {

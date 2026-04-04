@@ -40,6 +40,11 @@ function App() {
       navigator.serviceWorker.addEventListener('controllerchange', () => {
         window.location.reload();
       });
+      // Force SW to check for updates immediately on load, then every 60 seconds
+      navigator.serviceWorker.ready.then(reg => {
+        reg.update();
+        setInterval(() => reg.update(), 60000);
+      });
     }
   }, []);
 
