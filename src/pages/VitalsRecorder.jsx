@@ -25,7 +25,14 @@ function VitalsRecorder() {
   }, [patientId]);
 
   const loadPatient = async () => {
-    const patientData = await DatabaseService.getPatient(parseInt(patientId));
+    let patientData = null;
+    const numericId = parseInt(patientId);
+    if (!isNaN(numericId)) {
+      patientData = await DatabaseService.getPatient(numericId);
+    }
+    if (!patientData) {
+      patientData = await DatabaseService.db.patients.where('uhid').equals(patientId).first();
+    }
     if (!patientData) {
       navigate('/patients');
       return;
@@ -60,7 +67,7 @@ function VitalsRecorder() {
       await DatabaseService.addVitals(vitalsData);
 
       alert('✅ Vitals saved successfully!');
-      navigate(`/patients/${patientId}`);
+      navigate(`/patients/${patient?.uhid || patientId}`);
 
     } catch (error) {
       console.error('Failed to save vitals:', error);

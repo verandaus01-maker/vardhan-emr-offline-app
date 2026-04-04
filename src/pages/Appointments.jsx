@@ -166,7 +166,7 @@ function Appointments() {
                 <div className="flex items-start justify-between flex-wrap gap-3">
                   <div
                     className="flex-1 cursor-pointer"
-                    onClick={() => navigate(`/patients/${apt.patientId}`)}
+                    onClick={() => navigate(`/patients/${apt.uhid || apt.patientId}`)}
                   >
                     <p className="font-bold text-gray-800 text-lg">{apt.patientName}</p>
                     <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600 mt-1">

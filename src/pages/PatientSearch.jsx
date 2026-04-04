@@ -15,6 +15,10 @@ function PatientSearch() {
 
   useEffect(() => {
     loadRecentPatients();
+    // Re-pull from server whenever the tab gets focus (catches patients added on other profiles)
+    const onFocus = () => loadRecentPatients();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
   }, []);
 
   useEffect(() => {
@@ -41,14 +45,16 @@ function PatientSearch() {
         let merged = false;
         for (const sp of serverPatients) {
           if (!sp.uhid) continue;
-          const exists = await DatabaseService.db.patients.where('uhid').equals(sp.uhid).first();
-          if (!exists) {
-            const toAdd = { ...sp };
-            delete toAdd.id;
-            toAdd.syncStatus = 'synced';
-            await DatabaseService.db.patients.add(toAdd);
-            merged = true;
-          }
+          try {
+            const exists = await DatabaseService.db.patients.where('uhid').equals(sp.uhid).first();
+            if (!exists) {
+              const toAdd = { ...sp };
+              delete toAdd.id;
+              toAdd.syncStatus = 'synced';
+              await DatabaseService.db.patients.add(toAdd);
+              merged = true;
+            }
+          } catch (_) {}
         }
         if (merged) {
           const refreshed = await DatabaseService.getAllPatients(10);
@@ -68,13 +74,15 @@ function PatientSearch() {
           const data = await res.json();
           for (const sp of (data.patients || [])) {
             if (!sp.uhid) continue;
-            const exists = await DatabaseService.db.patients.where('uhid').equals(sp.uhid).first();
-            if (!exists) {
-              const toAdd = { ...sp };
-              delete toAdd.id;
-              toAdd.syncStatus = 'synced';
-              await DatabaseService.db.patients.add(toAdd);
-            }
+            try {
+              const exists = await DatabaseService.db.patients.where('uhid').equals(sp.uhid).first();
+              if (!exists) {
+                const toAdd = { ...sp };
+                delete toAdd.id;
+                toAdd.syncStatus = 'synced';
+                await DatabaseService.db.patients.add(toAdd);
+              }
+            } catch (_) {}
           }
         }
       } catch (_) {}
@@ -346,7 +354,7 @@ function AddPatientModal({ onClose, onSuccess }) {
         body: JSON.stringify({ ...patientData, id: patientId })
       }).catch(() => {});
 
-      onSuccess(patientId);
+      onSuccess(uhid); // navigate by UHID so all profiles route to the same patient
     } catch (error) {
       console.error('Failed to add patient:', error);
       // Show a user-friendly message, not the raw IndexedDB error

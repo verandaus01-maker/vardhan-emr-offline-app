@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import DatabaseService from './services/database';
+import { getServerUrl } from './utils/serverUrl';
 import syncService from './services/syncService';
 import gravityService from './services/gravityService';
 import reportAnalysisService from './services/reportAnalysisService';
@@ -40,7 +41,35 @@ function App() {
       navigator.serviceWorker.addEventListener('controllerchange', () => {
         window.location.reload();
       });
+      // Force SW to check for updates immediately on load, then every 60 seconds
+      navigator.serviceWorker.ready.then(reg => {
+        reg.update();
+        setInterval(() => reg.update(), 60000);
+      });
     }
+    // Poll server version every 30s — if server has newer code, clear SW cache and reload
+    let cachedVersion = null;
+    const checkVersion = async () => {
+      try {
+        const res = await fetch(`${getServerUrl()}/api/version?t=${Date.now()}`);
+        if (!res.ok) return;
+        const { version } = await res.json();
+        if (cachedVersion && cachedVersion !== version) {
+          // Server has new code — clear SW caches and reload
+          if ('serviceWorker' in navigator) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            for (const reg of regs) await reg.unregister();
+          }
+          const keys = await caches.keys();
+          for (const key of keys) await caches.delete(key);
+          window.location.reload(true);
+        }
+        cachedVersion = version;
+      } catch (_) {}
+    };
+    checkVersion();
+    const versionTimer = setInterval(checkVersion, 30000);
+    return () => clearInterval(versionTimer);
   }, []);
 
   const initializeApp = async () => {
@@ -106,6 +135,28 @@ function App() {
 
       setIsInitialized(true);
       console.log('App initialized successfully');
+
+      // If local DB is empty (fresh install / incognito / new device), auto-pull recent data from server
+      const stats = await DatabaseService.getStats();
+      if ((stats.patients || 0) === 0) {
+        console.log('Empty local DB detected — auto-pulling from server...');
+        try {
+          const res = await fetch(`${getServerUrl()}/api/patients?limit=500`);
+          if (res.ok) {
+            const data = await res.json();
+            for (const sp of (data.patients || [])) {
+              if (!sp.uhid) continue;
+              try {
+                const toAdd = { ...sp };
+                delete toAdd.id;
+                toAdd.syncStatus = 'synced';
+                await DatabaseService.db.patients.add(toAdd);
+              } catch (_) {}
+            }
+            console.log(`Auto-pulled ${data.patients?.length || 0} patients from server`);
+          }
+        } catch (_) {}
+      }
 
     } catch (error) {
       console.error('Failed to initialize app:', error);

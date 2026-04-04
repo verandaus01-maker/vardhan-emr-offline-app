@@ -692,6 +692,17 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', server: 'NexaCare Pro Sync Server', version: '1.0', timestamp: new Date().toISOString() });
 });
 
+// Version endpoint — clients poll this to detect when server has new code
+let _serverVersion = null;
+app.get('/api/version', (req, res) => {
+  if (!_serverVersion) {
+    try {
+      _serverVersion = execSync('git rev-parse --short HEAD', { cwd: __dirname }).toString().trim();
+    } catch (_) { _serverVersion = Date.now().toString(); }
+  }
+  res.json({ version: _serverVersion });
+});
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function tryParse(str) {
   if (!str) return null;

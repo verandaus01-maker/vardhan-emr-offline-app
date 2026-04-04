@@ -621,7 +621,8 @@ function PatientDetails() {
                 // (old prescriptions created before 2-stage workflow have no status field)
                 const isDraft = prescription.status === 'staff_draft' ||
                   (!prescription.status && !prescription.diagnosis);
-                const isDoctor = authService.canWrite();
+                const currentUser = authService.getCurrentUser();
+                const isDoctor = currentUser?.role === 'doctor' || currentUser?.role === 'admin';
 
                 return (
                   <div key={prescription.id} className={`card hover:shadow-lg transition ${isDraft ? 'border-2 border-orange-300' : 'border-2 border-green-300'}`}>

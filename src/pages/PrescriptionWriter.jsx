@@ -372,11 +372,17 @@ function PrescriptionWriter() {
   }, [drugSearch]);
 
   const loadPatient = async () => {
-    // Try numeric ID first, then UHID string, then server fetch
-    let patientData = await DatabaseService.getPatient(parseInt(patientId));
+    // Try numeric ID first (only if patientId is actually a number)
+    let patientData = null;
+    const numericId = parseInt(patientId);
+    if (!isNaN(numericId)) {
+      patientData = await DatabaseService.getPatient(numericId);
+    }
+    // Try UHID lookup
     if (!patientData) {
       patientData = await DatabaseService.db.patients.where('uhid').equals(patientId).first();
     }
+    // Try server fetch as last resort
     if (!patientData) {
       try {
         const res = await fetch(`${getServerUrl()}/api/patients?search=${encodeURIComponent(patientId)}&limit=10`);
@@ -401,7 +407,9 @@ function PrescriptionWriter() {
   };
 
   const loadExistingPrescription = async () => {
-    const rx = await DatabaseService.getPrescription(parseInt(prescriptionId));
+    const numId = parseInt(prescriptionId);
+    if (!prescriptionId || isNaN(numId)) return;
+    const rx = await DatabaseService.getPrescription(numId);
     if (!rx) return;
     setExistingPrescription(rx);
     // Pre-fill form with saved data
@@ -503,7 +511,7 @@ function PrescriptionWriter() {
       if (!isDoctor) {
         // Stage 1 — staff saves a draft
         const prescriptionData = {
-          patientId: parseInt(patientId),
+          patientId: patient.id,
           uhid: patient.uhid,
           date: new Date().toISOString(),
           doctorId: null,
@@ -528,13 +536,14 @@ function PrescriptionWriter() {
           body: JSON.stringify({ prescriptions: [prescriptionData] })
         }).catch(() => {});
         alert('✅ Saved! Waiting for Doctor to complete.');
-        navigate(`/patients/${patientId}`);
+        navigate(`/patients/${patient?.uhid || patientId}`);
 
       } else {
         // Stage 2 — doctor completes
         const prescriptionData = {
-          patientId: parseInt(patientId),
+          patientId: patient.id,
           uhid: patient.uhid,
+          createdAt: existingPrescription?.createdAt || new Date().toISOString(),
           date: existingPrescription?.date || new Date().toISOString(),
           doctorId: currentUser?.id || 1,
           complaints: formData.complaints,
@@ -558,7 +567,7 @@ function PrescriptionWriter() {
           body: JSON.stringify({ prescriptions: [prescriptionData] })
         }).catch(() => {});
         alert('✅ Prescription Complete!');
-        navigate(`/patients/${patientId}`);
+        navigate(`/patients/${patient?.uhid || patientId}`);
       }
 
     } catch (error) {
