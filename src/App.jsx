@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import DatabaseService from './services/database';
+import { getServerUrl } from './utils/serverUrl';
 import syncService from './services/syncService';
 import gravityService from './services/gravityService';
 import reportAnalysisService from './services/reportAnalysisService';
@@ -111,6 +112,28 @@ function App() {
 
       setIsInitialized(true);
       console.log('App initialized successfully');
+
+      // If local DB is empty (fresh install / incognito / new device), auto-pull recent data from server
+      const stats = await DatabaseService.getStats();
+      if ((stats.patients || 0) === 0) {
+        console.log('Empty local DB detected — auto-pulling from server...');
+        try {
+          const res = await fetch(`${getServerUrl()}/api/patients?limit=500`);
+          if (res.ok) {
+            const data = await res.json();
+            for (const sp of (data.patients || [])) {
+              if (!sp.uhid) continue;
+              try {
+                const toAdd = { ...sp };
+                delete toAdd.id;
+                toAdd.syncStatus = 'synced';
+                await DatabaseService.db.patients.add(toAdd);
+              } catch (_) {}
+            }
+            console.log(`Auto-pulled ${data.patients?.length || 0} patients from server`);
+          }
+        } catch (_) {}
+      }
 
     } catch (error) {
       console.error('Failed to initialize app:', error);
