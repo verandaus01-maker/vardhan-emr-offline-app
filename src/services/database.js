@@ -74,18 +74,18 @@ export class DatabaseService {
       updatedAt: new Date().toISOString(),
       syncStatus: 'pending'
     };
-    try {
-      const id = await db.patients.add(patient);
-      await this.addToSyncQueue('patients', 'create', { id, ...patient });
-      return id;
-    } catch (err) {
-      // UHID already exists locally — return existing record's ID
-      if ((err.name === 'ConstraintError' || err.message?.includes('uniqueness')) && patientData.uhid) {
-        const existing = await db.patients.where('uhid').equals(patientData.uhid).first();
+    // Atomic check-then-insert prevents ConstraintError under race conditions
+    // (e.g., background server pull adding same UHID simultaneously)
+    const id = await db.transaction('rw', db.patients, db.syncQueue, async () => {
+      if (patient.uhid) {
+        const existing = await db.patients.where('uhid').equals(patient.uhid).first();
         if (existing) return existing.id;
       }
-      throw err;
-    }
+      const newId = await db.patients.add(patient);
+      await db.syncQueue.add({ entity: 'patients', action: 'create', data: { id: newId, ...patient }, status: 'pending', attempts: 0, createdAt: new Date().toISOString() });
+      return newId;
+    });
+    return id;
   }
 
   static async updatePatient(id, updates) {
