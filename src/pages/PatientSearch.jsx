@@ -45,14 +45,16 @@ function PatientSearch() {
         let merged = false;
         for (const sp of serverPatients) {
           if (!sp.uhid) continue;
-          const exists = await DatabaseService.db.patients.where('uhid').equals(sp.uhid).first();
-          if (!exists) {
-            const toAdd = { ...sp };
-            delete toAdd.id;
-            toAdd.syncStatus = 'synced';
-            await DatabaseService.db.patients.add(toAdd);
-            merged = true;
-          }
+          try {
+            const exists = await DatabaseService.db.patients.where('uhid').equals(sp.uhid).first();
+            if (!exists) {
+              const toAdd = { ...sp };
+              delete toAdd.id;
+              toAdd.syncStatus = 'synced';
+              await DatabaseService.db.patients.add(toAdd);
+              merged = true;
+            }
+          } catch (_) {}
         }
         if (merged) {
           const refreshed = await DatabaseService.getAllPatients(10);
@@ -72,13 +74,15 @@ function PatientSearch() {
           const data = await res.json();
           for (const sp of (data.patients || [])) {
             if (!sp.uhid) continue;
-            const exists = await DatabaseService.db.patients.where('uhid').equals(sp.uhid).first();
-            if (!exists) {
-              const toAdd = { ...sp };
-              delete toAdd.id;
-              toAdd.syncStatus = 'synced';
-              await DatabaseService.db.patients.add(toAdd);
-            }
+            try {
+              const exists = await DatabaseService.db.patients.where('uhid').equals(sp.uhid).first();
+              if (!exists) {
+                const toAdd = { ...sp };
+                delete toAdd.id;
+                toAdd.syncStatus = 'synced';
+                await DatabaseService.db.patients.add(toAdd);
+              }
+            } catch (_) {}
           }
         }
       } catch (_) {}

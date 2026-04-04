@@ -407,7 +407,9 @@ function PrescriptionWriter() {
   };
 
   const loadExistingPrescription = async () => {
-    const rx = await DatabaseService.getPrescription(parseInt(prescriptionId));
+    const numId = parseInt(prescriptionId);
+    if (!prescriptionId || isNaN(numId)) return;
+    const rx = await DatabaseService.getPrescription(numId);
     if (!rx) return;
     setExistingPrescription(rx);
     // Pre-fill form with saved data
@@ -541,6 +543,7 @@ function PrescriptionWriter() {
         const prescriptionData = {
           patientId: patient.id,
           uhid: patient.uhid,
+          createdAt: existingPrescription?.createdAt || new Date().toISOString(),
           date: existingPrescription?.date || new Date().toISOString(),
           doctorId: currentUser?.id || 1,
           complaints: formData.complaints,
