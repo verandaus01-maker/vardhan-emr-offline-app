@@ -528,7 +528,7 @@ function PrescriptionWriter() {
           body: JSON.stringify({ prescriptions: [prescriptionData] })
         }).catch(() => {});
         alert('✅ Saved! Waiting for Doctor to complete.');
-        navigate(`/patients/${patientId}`);
+        navigate(`/patients/${patient?.uhid || patientId}`);
 
       } else {
         // Stage 2 — doctor completes
@@ -558,7 +558,7 @@ function PrescriptionWriter() {
           body: JSON.stringify({ prescriptions: [prescriptionData] })
         }).catch(() => {});
         alert('✅ Prescription Complete!');
-        navigate(`/patients/${patientId}`);
+        navigate(`/patients/${patient?.uhid || patientId}`);
       }
 
     } catch (error) {

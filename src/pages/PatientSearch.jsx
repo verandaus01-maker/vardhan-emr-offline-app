@@ -350,7 +350,7 @@ function AddPatientModal({ onClose, onSuccess }) {
         body: JSON.stringify({ ...patientData, id: patientId })
       }).catch(() => {});
 
-      onSuccess(patientId);
+      onSuccess(uhid); // navigate by UHID so all profiles route to the same patient
     } catch (error) {
       console.error('Failed to add patient:', error);
       // Show a user-friendly message, not the raw IndexedDB error
